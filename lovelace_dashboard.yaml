@@ -1,0 +1,76 @@
+# Baby Tracker Dashboard Example
+# Copia questo codice in una nuova "Vista" (View) della tua Dashboard Lovelace su Home Assistant.
+# Oppure copia le singole card.
+
+title: Baby Tracker
+icon: mdi:baby-carriage
+cards:
+  # -------------------------------------------------------------
+  # RIEPILOGO GIORNALIERO (Grid)
+  # -------------------------------------------------------------
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: entity
+        entity: counter.baby_feeding_daily
+        name: Poppate
+        icon: mdi:baby-bottle
+        state_color: true
+      
+      - type: entity
+        entity: counter.baby_diaper_poo_daily
+        name: Cacche
+        icon: mdi:emoticon-poop
+        state_color: true
+      
+      - type: entity
+        entity: counter.baby_diaper_pee_daily
+        name: Pipì
+        icon: mdi:water
+        state_color: true
+
+  # -------------------------------------------------------------
+  # STATUS ATTUALE (Entità)
+  # -------------------------------------------------------------
+  - type: entities
+    title: Stato Attuale
+    entities:
+      - entity: input_boolean.baby_feeding_timer_active
+        name: Timer Poppata Live
+        secondary_info: last-updated
+      
+      - entity: input_datetime.baby_last_feeding_end
+        name: Fine Ultima Poppata
+        secondary_info: last-updated
+      
+      - type: attribute
+        entity: input_text.baby_last_feeding_side
+        attribute: min
+        name: Lato Ultima Poppata
+        icon: mdi:format-list-bulleted
+      
+      - entity: input_datetime.baby_last_poo
+        name: Ultima Cacca
+        secondary_info: last-updated
+
+  # -------------------------------------------------------------
+  # CALENDARIO (Timeline)
+  # -------------------------------------------------------------
+  - type: calendar
+    title: Storico Eventi
+    entities:
+      - calendar.baby_tracker
+    initial_view: dayGridMonth  # Oppure 'listWeek' per la lista
+
+  # -------------------------------------------------------------
+  # CRESCITA (Grafico)
+  # -------------------------------------------------------------
+  - type: history-graph
+    title: Grafico Crescita
+    hours_to_show: 720  # 30 Giorni
+    entities:
+      - entity: input_number.baby_weight
+        name: Peso
+      - entity: input_number.baby_height
+        name: Altezza
