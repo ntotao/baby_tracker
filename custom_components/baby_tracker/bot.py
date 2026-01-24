@@ -116,12 +116,15 @@ async def log_event(context: ContextTypes.DEFAULT_TYPE, summary: str, start_dt: 
 @check_access
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends the main menu."""
+    baby_name = context.bot_data.get('baby_name', 'Baby')
+    msg = f'👶 **{baby_name} Tracker** - Main Menu:'
+    
     if update.message:
-        await update.message.reply_text('👶 Baby Tracker Bot - Main Menu:', reply_markup=main_menu_keyboard())
+        await update.message.reply_text(msg, reply_markup=main_menu_keyboard(), parse_mode='Markdown')
     else:
         query = update.callback_query
         await query.answer()
-        await query.edit_message_text('👶 Baby Tracker Bot - Main Menu:', reply_markup=main_menu_keyboard())
+        await query.edit_message_text(msg, reply_markup=main_menu_keyboard(), parse_mode='Markdown')
     return ConversationHandler.END
 
 @check_access
@@ -458,7 +461,7 @@ async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     return ConversationHandler.END
 
 
-async def setup_bot(hass: HomeAssistant, token: str, allowed_ids: list, entry_id: str):
+async def setup_bot(hass: HomeAssistant, token: str, allowed_ids: list, entry_id: str, baby_name: str):
     """Initialize and start the bot."""
     application = ApplicationBuilder().token(token).build()
     
@@ -466,6 +469,7 @@ async def setup_bot(hass: HomeAssistant, token: str, allowed_ids: list, entry_id
     application.bot_data['hass'] = hass
     application.bot_data['allowed_ids'] = allowed_ids
     application.bot_data['entry_id'] = entry_id
+    application.bot_data['baby_name'] = baby_name
     
     feeding_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_callback, pattern='^start_feeding_flow$')],

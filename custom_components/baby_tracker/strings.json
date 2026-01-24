@@ -6,7 +6,8 @@
                 "description": "Connect your Telegram Bot. You need the Token from @BotFather.",
                 "data": {
                     "telegram_token": "Telegram Bot Token",
-                    "allowed_chat_ids": "Allowed User IDs (comma separated)"
+                    "allowed_chat_ids": "Allowed User IDs (comma separated)",
+                    "baby_name": "Baby Name"
                 }
             }
         },
@@ -15,6 +16,17 @@
         },
         "abort": {
             "already_configured": "Baby Tracker is already configured."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Configure Baby Tracker",
+                "data": {
+                    "allowed_chat_ids": "Allowed User IDs (comma separated)",
+                    "baby_name": "Baby Name"
+                }
+            }
         }
     }
 }

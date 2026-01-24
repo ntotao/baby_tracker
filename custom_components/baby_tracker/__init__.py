@@ -3,7 +3,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, CONF_TELEGRAM_TOKEN, CONF_ALLOWED_CHAT_IDS
+from .const import DOMAIN, CONF_TELEGRAM_TOKEN, CONF_ALLOWED_CHAT_IDS, CONF_BABY_NAME
 from .bot import setup_bot
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,8 +16,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Baby Tracker from a config entry."""
     token = entry.data.get(CONF_TELEGRAM_TOKEN)
     
-    # Parse allowed IDs (comma separated string -> list of ints)
-    allowed_ids_str = entry.data.get(CONF_ALLOWED_CHAT_IDS, "")
+    # Merge options into data-like structure. 
+    # Options take precedence over Data (initial setup).
+    allowed_ids_str = entry.options.get(CONF_ALLOWED_CHAT_IDS, entry.data.get(CONF_ALLOWED_CHAT_IDS, ""))
+    baby_name = entry.options.get(CONF_BABY_NAME, entry.data.get(CONF_BABY_NAME, "Baby"))
+    
     allowed_ids = []
     if allowed_ids_str:
         try:
@@ -29,18 +32,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.error("Telegram Token not found in config entry")
         return False
 
-    _LOGGER.info("Starting Baby Tracker Bot with Allowed IDs: %s", allowed_ids)
+    _LOGGER.info("Starting %s Tracker Bot...", baby_name)
     
     # Start Bot
     try:
         # Pass entry_id so bot can find the store
-        application = await setup_bot(hass, token, allowed_ids, entry.entry_id)
+        application = await setup_bot(hass, token, allowed_ids, entry.entry_id, baby_name)
         
         hass.data.setdefault(DOMAIN, {})
         hass.data[DOMAIN][entry.entry_id] = application
         
         # Forward setup of calendar platform
         await hass.config_entries.async_forward_entry_setups(entry, ["calendar"])
+        
+        # Listen for updates to options
+        entry.async_on_unload(entry.add_update_listener(update_listener))
         
     except Exception as e:
         _LOGGER.exception("Failed to start Telegram Bot: %s", e)
@@ -57,5 +63,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
+        
+    return await hass.config_entries.async_unload_platforms(entry, ["calendar"])
 
-    return True
+async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
+    """Handle options update."""
+    await hass.config_entries.async_reload(entry.entry_id)
