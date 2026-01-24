@@ -9,5 +9,5 @@
   "requirements": [
     "python-telegram-bot>=20.0"
   ],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }
