@@ -33,10 +33,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     
     # Start Bot
     try:
-        application = await setup_bot(hass, token, allowed_ids)
+        # Pass entry_id so bot can find the store
+        application = await setup_bot(hass, token, allowed_ids, entry.entry_id)
         
         hass.data.setdefault(DOMAIN, {})
         hass.data[DOMAIN][entry.entry_id] = application
+        
+        # Forward setup of calendar platform
+        await hass.config_entries.async_forward_entry_setups(entry, ["calendar"])
         
     except Exception as e:
         _LOGGER.exception("Failed to start Telegram Bot: %s", e)

@@ -13,6 +13,7 @@ from telegram.ext import (
     filters
 )
 from homeassistant.core import HomeAssistant
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,16 +52,18 @@ def get_hass(context: ContextTypes.DEFAULT_TYPE) -> HomeAssistant:
     """Retrieve hass instance from bot_data."""
     return context.bot_data.get('hass')
 
+def get_store(context: ContextTypes.DEFAULT_TYPE):
+    """Retrieve EventStore instance."""
+    hass = get_hass(context)
+    entry_id = context.bot_data.get('entry_id')
+    return hass.data[DOMAIN].get(entry_id + "_store")
+
 def check_access(func):
     """Decorator to check if user has access."""
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         allowed_ids = context.bot_data.get('allowed_ids', [])
         user_id = update.effective_user.id
-        
-        # If no IDs are configured, allow everyone (or deny? Safe default: allow but log warning)
-        # Decision: If empty, we could warn, but for security, usually Allow List implies Deny All Else.
-        # User explicitly asked for multi-user config.
         
         if allowed_ids and user_id not in allowed_ids:
             _LOGGER.warning("Unauthorized access attempt from User ID: %s", user_id)
@@ -99,6 +102,12 @@ async def update_timestamp(hass: HomeAssistant, entity_id: str, dt: datetime = N
         'set_datetime', 
         {'entity_id': entity_id, 'timestamp': dt.timestamp()}
     )
+
+async def log_event(context: ContextTypes.DEFAULT_TYPE, summary: str, start_dt: datetime, end_dt: datetime = None, description: str = ""):
+    """Log an event to the EventStore (Calendar)."""
+    store = get_store(context)
+    if store:
+        await store.add_event(summary, start_dt, end_dt, description)
 
 # ------------------------------------------------------------------------------
 # HANDLERS
@@ -166,41 +175,70 @@ async def handle_diaper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hass = get_hass(context)
     await query.answer()
 
+    now = datetime.now()
+    
     if data == 'diaper_poo':
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
-        await update_timestamp(hass, ENTITIES['poo_time'])
+        await update_timestamp(hass, ENTITIES['poo_time'], now)
+        await log_event(context, "💩 Cacca", now)
         await query.edit_message_text("✅ Registrata Cacca!", reply_markup=back_button())
     
     elif data == 'diaper_pee':
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
-        await update_timestamp(hass, ENTITIES['pee_time'])
+        await update_timestamp(hass, ENTITIES['pee_time'], now)
+        await log_event(context, "💧 Pipì", now)
         await query.edit_message_text("✅ Registrata Pipì!", reply_markup=back_button())
 
     elif data == 'diaper_both':
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
-        await update_timestamp(hass, ENTITIES['poo_time'])
+        await update_timestamp(hass, ENTITIES['poo_time'], now)
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
-        await update_timestamp(hass, ENTITIES['pee_time'])
+        await update_timestamp(hass, ENTITIES['pee_time'], now)
+        await log_event(context, "💩+💧 Misto", now)
         await query.edit_message_text("✅ Registrato Cambio Completo!", reply_markup=back_button())
 
 async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    hass = get_hass(context)
     
-    def get_state(entity_id):
-        s = hass.states.get(entity_id)
-        return s.state if s else '?'
+    store = get_store(context)
+    stats = {"poo": 0, "pee": 0, "feeding": 0}
+    last_events = {"feeding": None, "poo": None, "pee": None}
 
-    poo = get_state(ENTITIES['poo_counter'])
-    pee = get_state(ENTITIES['pee_counter'])
-    feed = get_state(ENTITIES['feeding_counter'])
+    if store:
+        stats = store.get_stats_last_24h()
+        last_events = store.get_last_events()
+    
+    # Helper to format frequency
+    def fmt_time(dt_iso):
+        if not dt_iso: return "--:--"
+        dt = datetime.fromisoformat(dt_iso)
+        return dt.strftime("%H:%M")
+    
+    def fmt_ago(event):
+        if not event: return "Mai"
+        dt = datetime.fromisoformat(event['end']) # Use end time for age
+        diff = datetime.now() - dt
+        mins = int(diff.total_seconds() / 60)
+        
+        if mins < 60:
+            return f"{mins} min fa"
+        hours = mins // 60
+        mins = mins % 60
+        return f"{hours}h {mins}m fa"
+
     
     text = (
-        f"📊 **Stato Giornaliero**\n\n"
-        f"💩 Cacche: {poo}\n"
-        f"💧 Pipì: {pee}\n"
-        f"🍼 Poppate: {feed}"
+        f"📊 **Statistiche Ultime 24h**\n\n"
+        f"🍼 **Poppate**: {stats['feeding']}\n"
+        f"   🕒 Ultima: {fmt_ago(last_events['feeding'])}\n"
+        f"   📝 {last_events['feeding']['description'] if last_events['feeding'] else ''}\n\n"
+        
+        f"💩 **Cacche**: {stats['poo']}\n"
+        f"   🕒 Ultima: {fmt_ago(last_events['poo'])}\n"
+        
+        f"💧 **Pipì**: {stats['pee']}\n"
+        f"   🕒 Ultima: {fmt_ago(last_events['pee'])}\n"
     )
     await query.edit_message_text(text, parse_mode='Markdown', reply_markup=back_button())
 
@@ -262,7 +300,17 @@ async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
         
-        await query.edit_message_text("✅ Poppata registrata!", reply_markup=back_button())
+        # Calculate duration
+        start_state = hass.states.get(ENTITIES['feeding_start'])
+        end_state = hass.states.get(ENTITIES['feeding_end'])
+        start_dt = datetime.fromtimestamp(start_state.attributes['timestamp'])
+        end_dt = datetime.fromtimestamp(end_state.attributes['timestamp'])
+        duration = int((end_dt - start_dt).total_seconds() / 60)
+        desc = f"Lato: {side}, Durata: {duration} min"
+
+        await log_event(context, "🍼 Poppata", start_dt, end_dt, desc)
+        
+        await query.edit_message_text(f"✅ Poppata registrata! ({duration} min)", reply_markup=back_button())
         return ConversationHandler.END
 
 @check_access
@@ -336,6 +384,8 @@ async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     start_dt = context.user_data['manual_start']
     end_dt = context.user_data['manual_end']
     duration_str = f"{context.user_data['manual_duration']} min"
+    
+    desc = f"Lato: {side}, Durata: {duration_str}"
 
     await update_timestamp(hass, ENTITIES['feeding_start'], start_dt)
     await update_timestamp(hass, ENTITIES['feeding_end'], end_dt)
@@ -344,6 +394,8 @@ async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_duration'], 'value': duration_str})
     
     await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
+    
+    await log_event(context, "🍼 Poppata", start_dt, end_dt, desc)
 
     await query.edit_message_text("✅ Poppata manuale registrata con successo!", reply_markup=back_button())
     return ConversationHandler.END
@@ -406,13 +458,14 @@ async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     return ConversationHandler.END
 
 
-async def setup_bot(hass: HomeAssistant, token: str, allowed_ids: list):
+async def setup_bot(hass: HomeAssistant, token: str, allowed_ids: list, entry_id: str):
     """Initialize and start the bot."""
     application = ApplicationBuilder().token(token).build()
     
     # Inject hass context AND allowed IDs
     application.bot_data['hass'] = hass
     application.bot_data['allowed_ids'] = allowed_ids
+    application.bot_data['entry_id'] = entry_id
     
     feeding_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_callback, pattern='^start_feeding_flow$')],
