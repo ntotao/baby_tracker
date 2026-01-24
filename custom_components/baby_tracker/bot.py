@@ -1,5 +1,6 @@
 """Telegram Bot Logic for Baby Tracker."""
 import logging
+from functools import wraps
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -50,6 +51,28 @@ def get_hass(context: ContextTypes.DEFAULT_TYPE) -> HomeAssistant:
     """Retrieve hass instance from bot_data."""
     return context.bot_data.get('hass')
 
+def check_access(func):
+    """Decorator to check if user has access."""
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        allowed_ids = context.bot_data.get('allowed_ids', [])
+        user_id = update.effective_user.id
+        
+        # If no IDs are configured, allow everyone (or deny? Safe default: allow but log warning)
+        # Decision: If empty, we could warn, but for security, usually Allow List implies Deny All Else.
+        # User explicitly asked for multi-user config.
+        
+        if allowed_ids and user_id not in allowed_ids:
+            _LOGGER.warning("Unauthorized access attempt from User ID: %s", user_id)
+            if update.message:
+                await update.message.reply_text(f"⛔ **Access Denied**\nYour ID: `{user_id}`\n\nAsk the owner to add this ID to Home Assistant Baby Tracker configuration.", parse_mode='Markdown')
+            elif update.callback_query:
+                await update.callback_query.answer("⛔ Access Denied", show_alert=True)
+            return ConversationHandler.END
+            
+        return await func(update, context, *args, **kwargs)
+    return wrapper
+
 # ------------------------------------------------------------------------------
 # HELPERS
 # ------------------------------------------------------------------------------
@@ -81,6 +104,7 @@ async def update_timestamp(hass: HomeAssistant, entity_id: str, dt: datetime = N
 # HANDLERS
 # ------------------------------------------------------------------------------
 
+@check_access
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends the main menu."""
     if update.message:
@@ -91,6 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text('👶 Baby Tracker Bot - Main Menu:', reply_markup=main_menu_keyboard())
     return ConversationHandler.END
 
+@check_access
 async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -182,6 +207,7 @@ async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ------------------------------------------------------------------------------
 # FEEDING FLOW
 # ------------------------------------------------------------------------------
+@check_access
 async def feeding_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -211,6 +237,7 @@ async def feeding_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         await start(update, context)
         return ConversationHandler.END
 
+@check_access
 async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -238,6 +265,7 @@ async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("✅ Poppata registrata!", reply_markup=back_button())
         return ConversationHandler.END
 
+@check_access
 async def manual_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -271,6 +299,7 @@ async def manual_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text("Quanto è durata?", reply_markup=InlineKeyboardMarkup(keyboard))
     return MANUAL_DURATION
 
+@check_access
 async def manual_duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -296,6 +325,7 @@ async def manual_duration_choice(update: Update, context: ContextTypes.DEFAULT_T
     await query.edit_message_text("Quale lato?", reply_markup=InlineKeyboardMarkup(keyboard))
     return MANUAL_SIDE
 
+@check_access
 async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -321,6 +351,7 @@ async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ------------------------------------------------------------------------------
 # GROWTH FLOW
 # ------------------------------------------------------------------------------
+@check_access
 async def growth_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -346,6 +377,7 @@ async def growth_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     return GROWTH_INPUT
 
+@check_access
 async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.replace(',', '.')
     growth_type = context.user_data.get('growth_type')
@@ -374,12 +406,13 @@ async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     return ConversationHandler.END
 
 
-async def setup_bot(hass: HomeAssistant, token: str):
+async def setup_bot(hass: HomeAssistant, token: str, allowed_ids: list):
     """Initialize and start the bot."""
     application = ApplicationBuilder().token(token).build()
     
-    # Inject hass context
+    # Inject hass context AND allowed IDs
     application.bot_data['hass'] = hass
+    application.bot_data['allowed_ids'] = allowed_ids
     
     feeding_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_callback, pattern='^start_feeding_flow$')],
