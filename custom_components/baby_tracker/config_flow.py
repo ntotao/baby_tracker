@@ -55,21 +55,20 @@ class BabyTrackerOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
-            # Update config entry (merging options into data for simplicity in init)
-            # In a clean implementation, options are separate, but here we can merge or just use options.
-            # To avoid complexity in __init__, we update the main entry data if we can,
-            # or we stick to standard HA pattern: Data is Setup, Options are Runtime/Changeable.
-            
-            # Let's save to options, and in __init__ we look at both.
             return self.async_create_entry(title="", data=user_input)
 
-        # Default values from current config
-        current_ids = self.config_entry.options.get(CONF_ALLOWED_CHAT_IDS, self.config_entry.data.get(CONF_ALLOWED_CHAT_IDS, ""))
-        current_name = self.config_entry.options.get(CONF_BABY_NAME, self.config_entry.data.get(CONF_BABY_NAME, "Baby"))
+        try:
+            # Default values from current config
+            # Ensure they are strings to avoid validation errors
+            current_ids = str(self.config_entry.options.get(CONF_ALLOWED_CHAT_IDS, self.config_entry.data.get(CONF_ALLOWED_CHAT_IDS, "")))
+            current_name = str(self.config_entry.options.get(CONF_BABY_NAME, self.config_entry.data.get(CONF_BABY_NAME, "Baby")))
 
-        options_schema = vol.Schema({
-            vol.Required(CONF_ALLOWED_CHAT_IDS, default=current_ids): str,
-            vol.Optional(CONF_BABY_NAME, default=current_name): str,
-        })
+            options_schema = vol.Schema({
+                vol.Required(CONF_ALLOWED_CHAT_IDS, default=current_ids): str,
+                vol.Optional(CONF_BABY_NAME, default=current_name): str,
+            })
 
-        return self.async_show_form(step_id="init", data_schema=options_schema)
+            return self.async_show_form(step_id="init", data_schema=options_schema)
+        except Exception as e:
+            _LOGGER.exception("Failed to load Options Flow: %s", e)
+            return self.async_abort(reason="unknown_error")
