@@ -48,7 +48,7 @@ class BabyTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class BabyTrackerOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options."""
 
-    def __init__(self, config_entry):
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         self.config_entry = config_entry
 
@@ -57,18 +57,22 @@ class BabyTrackerOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        try:
-            # Default values from current config
-            # Ensure they are strings to avoid validation errors
-            current_ids = str(self.config_entry.options.get(CONF_ALLOWED_CHAT_IDS, self.config_entry.data.get(CONF_ALLOWED_CHAT_IDS, "")))
-            current_name = str(self.config_entry.options.get(CONF_BABY_NAME, self.config_entry.data.get(CONF_BABY_NAME, "Baby")))
+        # Robust default retrieval
+        data = self.config_entry.data
+        options = self.config_entry.options
+        
+        # Get current values, fallback to data, then fallback to empty/default string
+        current_ids = options.get(CONF_ALLOWED_CHAT_IDS, data.get(CONF_ALLOWED_CHAT_IDS, ""))
+        current_name = options.get(CONF_BABY_NAME, data.get(CONF_BABY_NAME, "Baby"))
 
-            options_schema = vol.Schema({
-                vol.Required(CONF_ALLOWED_CHAT_IDS, default=current_ids): str,
-                vol.Optional(CONF_BABY_NAME, default=current_name): str,
-            })
+        # Explicitly cast to string to ensure Schema compatibility (prevent 500 on None/Int)
+        if current_ids is None: current_ids = ""
+        current_ids = str(current_ids)
+        current_name = str(current_name)
 
-            return self.async_show_form(step_id="init", data_schema=options_schema)
-        except Exception as e:
-            _LOGGER.exception("Failed to load Options Flow: %s", e)
-            return self.async_abort(reason="unknown_error")
+        options_schema = vol.Schema({
+            vol.Required(CONF_ALLOWED_CHAT_IDS, default=current_ids): str,
+            vol.Optional(CONF_BABY_NAME, default=current_name): str,
+        })
+
+        return self.async_show_form(step_id="init", data_schema=options_schema)

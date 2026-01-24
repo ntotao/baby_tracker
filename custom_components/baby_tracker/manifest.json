@@ -1,13 +1,15 @@
 {
   "domain": "baby_tracker",
   "name": "Baby Tracker",
-  "codeowners": [],
   "config_flow": true,
   "documentation": "https://github.com/ntota/baby_tracker",
-  "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/ntota/baby_tracker/issues",
   "requirements": [
     "python-telegram-bot>=20.0"
   ],
-  "version": "0.3.1"
+  "issue_tracker": "https://github.com/ntota/baby_tracker/issues",
+  "codeowners": [
+    "@ntota"
+  ],
+  "iot_class": "cloud_polling",
+  "version": "0.3.2"
 }
