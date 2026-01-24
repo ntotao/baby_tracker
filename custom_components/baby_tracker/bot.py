@@ -1,36 +1,19 @@
-import os
+"""Telegram Bot Logic for Baby Tracker."""
 import logging
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, 
-    ContextTypes, 
-    CommandHandler, 
-    CallbackQueryHandler, 
-    ConversationHandler, 
-    MessageHandler, 
+    ApplicationBuilder,
+    ContextTypes,
+    CommandHandler,
+    CallbackQueryHandler,
+    ConversationHandler,
+    MessageHandler,
     filters
 )
+from homeassistant.core import HomeAssistant
 
-from ha_client import HomeAssistantClient
-
-# Load env variables
-load_dotenv()
-
-HA_URL = os.getenv("HA_URL")
-HA_TOKEN = os.getenv("HA_TOKEN")
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-
-# Logging setup
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Initialize HA Client
-ha = HomeAssistantClient(HA_URL, HA_TOKEN)
+_LOGGER = logging.getLogger(__name__)
 
 # Entity Constant Map
 ENTITIES = {
@@ -63,6 +46,10 @@ ENTITIES = {
     GROWTH_INPUT
 ) = range(7)
 
+def get_hass(context: ContextTypes.DEFAULT_TYPE) -> HomeAssistant:
+    """Retrieve hass instance from bot_data."""
+    return context.bot_data.get('hass')
+
 # ------------------------------------------------------------------------------
 # HELPERS
 # ------------------------------------------------------------------------------
@@ -79,6 +66,17 @@ def main_menu_keyboard():
         [InlineKeyboardButton("📊 Stato", callback_data='status')]
     ])
 
+async def update_timestamp(hass: HomeAssistant, entity_id: str, dt: datetime = None):
+    """Update an input_datetime to now or specific time."""
+    if dt is None:
+        dt = datetime.now()
+    
+    await hass.services.async_call(
+        'input_datetime', 
+        'set_datetime', 
+        {'entity_id': entity_id, 'timestamp': dt.timestamp()}
+    )
+
 # ------------------------------------------------------------------------------
 # HANDLERS
 # ------------------------------------------------------------------------------
@@ -88,16 +86,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
         await update.message.reply_text('👶 Baby Tracker Bot - Main Menu:', reply_markup=main_menu_keyboard())
     else:
-        # If triggered by a "Cancel" or "Back" callback that calls start()
         query = update.callback_query
         await query.answer()
         await query.edit_message_text('👶 Baby Tracker Bot - Main Menu:', reply_markup=main_menu_keyboard())
     return ConversationHandler.END
 
 async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles main menu buttons (Diaper, Status) that don't start a conversation."""
     query = update.callback_query
     data = query.data
+    hass = get_hass(context)
 
     if data == 'main_menu':
         await start(update, context)
@@ -108,17 +105,14 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
     
     if data == 'start_feeding_flow':
-        # Check if timer is running
-        state_obj = ha.get_state(ENTITIES['feeding_active'])
-        is_active = state_obj and state_obj.get('state') == 'on'
+        state = hass.states.get(ENTITIES['feeding_active'])
+        is_active = state and state.state == 'on'
         
         if is_active:
-            # Timer is running -> Show Stop Menu
             keyboard = [[InlineKeyboardButton("⏹️ STOP Poppata", callback_data='live_stop')]]
             await query.edit_message_text("⏱️ Poppata in corso... Terminare?", reply_markup=InlineKeyboardMarkup(keyboard))
-            return LIVE_STOP_SIDE # Next step is choosing side after stop
+            return LIVE_STOP_SIDE 
         else:
-            # Timer not running -> Show Start/Manual Menu
             keyboard = [
                 [InlineKeyboardButton("▶️ AVVIA Timer", callback_data='live_start')],
                 [InlineKeyboardButton("📝 Inserimento Manuale", callback_data='manual_entry')],
@@ -132,7 +126,6 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
         
     if data == 'growth_menu':
-        # Show Growth Sub-menu
         keyboard = [
             [InlineKeyboardButton("⚖️ Peso", callback_data='growth_weight')],
             [InlineKeyboardButton("📏 Altezza", callback_data='growth_height')],
@@ -145,61 +138,65 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_diaper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
+    hass = get_hass(context)
     await query.answer()
 
     if data == 'diaper_poo':
-        ha.increment_counter(ENTITIES['poo_counter'])
-        ha.update_date_time_now(ENTITIES['poo_time'])
+        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
+        await update_timestamp(hass, ENTITIES['poo_time'])
         await query.edit_message_text("✅ Registrata Cacca!", reply_markup=back_button())
     
     elif data == 'diaper_pee':
-        ha.increment_counter(ENTITIES['pee_counter'])
-        ha.update_date_time_now(ENTITIES['pee_time'])
+        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
+        await update_timestamp(hass, ENTITIES['pee_time'])
         await query.edit_message_text("✅ Registrata Pipì!", reply_markup=back_button())
 
     elif data == 'diaper_both':
-        ha.increment_counter(ENTITIES['poo_counter'])
-        ha.update_date_time_now(ENTITIES['poo_time'])
-        ha.increment_counter(ENTITIES['pee_counter'])
-        ha.update_date_time_now(ENTITIES['pee_time'])
+        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
+        await update_timestamp(hass, ENTITIES['poo_time'])
+        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
+        await update_timestamp(hass, ENTITIES['pee_time'])
         await query.edit_message_text("✅ Registrato Cambio Completo!", reply_markup=back_button())
 
 async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    hass = get_hass(context)
     
-    poo_count = ha.get_state(ENTITIES['poo_counter']) or {'state': '?'}
-    pee_count = ha.get_state(ENTITIES['pee_counter']) or {'state': '?'}
-    feed_count = ha.get_state(ENTITIES['feeding_counter']) or {'state': '?'}
+    def get_state(entity_id):
+        s = hass.states.get(entity_id)
+        return s.state if s else '?'
+
+    poo = get_state(ENTITIES['poo_counter'])
+    pee = get_state(ENTITIES['pee_counter'])
+    feed = get_state(ENTITIES['feeding_counter'])
     
     text = (
         f"📊 **Stato Giornaliero**\n\n"
-        f"💩 Cacche: {poo_count['state']}\n"
-        f"💧 Pipì: {pee_count['state']}\n"
-        f"🍼 Poppate: {feed_count['state']}"
+        f"💩 Cacche: {poo}\n"
+        f"💧 Pipì: {pee}\n"
+        f"🍼 Poppate: {feed}"
     )
     await query.edit_message_text(text, parse_mode='Markdown', reply_markup=back_button())
 
 # ------------------------------------------------------------------------------
-# FEEDING FLOW HANDLERS
+# FEEDING FLOW
 # ------------------------------------------------------------------------------
-
 async def feeding_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
+    hass = get_hass(context)
     await query.answer()
 
     if data == 'live_start':
-        # Start Timer
-        ha.call_service('input_boolean', 'turn_on', {'entity_id': ENTITIES['feeding_active']})
-        ha.update_date_time_now(ENTITIES['feeding_start'])
+        await hass.services.async_call('input_boolean', 'turn_on', {'entity_id': ENTITIES['feeding_active']})
+        await update_timestamp(hass, ENTITIES['feeding_start'])
         
         keyboard = [[InlineKeyboardButton("⏹️ STOP Poppata", callback_data='live_stop')]]
         await query.edit_message_text("▶️ Poppata AVVIATA! Premi Stop quando finito.", reply_markup=InlineKeyboardMarkup(keyboard))
-        return LIVE_STOP_SIDE # In this state we wait for stop
+        return LIVE_STOP_SIDE 
 
     elif data == 'manual_entry':
-        # Ask Time
         keyboard = [
             [InlineKeyboardButton("Adesso", callback_data='time_now')],
             [InlineKeyboardButton("15 min fa", callback_data='time_15')],
@@ -215,17 +212,15 @@ async def feeding_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ConversationHandler.END
 
 async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Called when user presses STOP on a live timer."""
     query = update.callback_query
     data = query.data
+    hass = get_hass(context)
     await query.answer()
 
     if data == 'live_stop':
-        # Stop Timer Logic
-        ha.call_service('input_boolean', 'turn_off', {'entity_id': ENTITIES['feeding_active']})
-        ha.update_date_time_now(ENTITIES['feeding_end'])
+        await hass.services.async_call('input_boolean', 'turn_off', {'entity_id': ENTITIES['feeding_active']})
+        await update_timestamp(hass, ENTITIES['feeding_end'])
         
-        # Ask Side
         keyboard = [
             [InlineKeyboardButton("Sinistra (SX)", callback_data='side_sx'),
              InlineKeyboardButton("Destra (DX)", callback_data='side_dx')],
@@ -233,15 +228,13 @@ async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
              InlineKeyboardButton("Biberon", callback_data='side_bottle')]
         ]
         await query.edit_message_text("Poppata terminata! Quale lato?", reply_markup=InlineKeyboardMarkup(keyboard))
-        return LIVE_STOP_SIDE # Re-using this state to capture side choice
+        return LIVE_STOP_SIDE
 
-    # If it's a side choice coming from the just-stopped timer
     if data.startswith('side_'):
         side = data.replace('side_', '')
-        ha.call_service('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
-        ha.increment_counter(ENTITIES['feeding_counter'])
+        await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
+        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
         
-        # Calculate duration for feedback (optional, HA has timestamps)
         await query.edit_message_text("✅ Poppata registrata!", reply_markup=back_button())
         return ConversationHandler.END
 
@@ -254,7 +247,6 @@ async def manual_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await start(update, context)
         return ConversationHandler.END
 
-    # Calculate timestamps based on selection
     now = datetime.now()
     start_dt = now
     
@@ -267,7 +259,6 @@ async def manual_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     context.user_data['manual_start'] = start_dt
 
-    # Ask Duration
     keyboard = [
         [InlineKeyboardButton("5 min", callback_data='dur_5'),
          InlineKeyboardButton("10 min", callback_data='dur_10')],
@@ -296,7 +287,6 @@ async def manual_duration_choice(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['manual_end'] = end_dt
     context.user_data['manual_duration'] = duration_min
 
-    # Ask Side
     keyboard = [
         [InlineKeyboardButton("Sinistra (SX)", callback_data='side_sx'),
          InlineKeyboardButton("Destra (DX)", callback_data='side_dx')],
@@ -309,6 +299,7 @@ async def manual_duration_choice(update: Update, context: ContextTypes.DEFAULT_T
 async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
+    hass = get_hass(context)
     await query.answer()
 
     side = data.replace('side_', '')
@@ -316,22 +307,20 @@ async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     end_dt = context.user_data['manual_end']
     duration_str = f"{context.user_data['manual_duration']} min"
 
-    # Save everything to HA
-    ha.update_date_time_custom(ENTITIES['feeding_start'], start_dt)
-    ha.update_date_time_custom(ENTITIES['feeding_end'], end_dt)
+    await update_timestamp(hass, ENTITIES['feeding_start'], start_dt)
+    await update_timestamp(hass, ENTITIES['feeding_end'], end_dt)
     
-    ha.call_service('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
-    ha.call_service('input_text', 'set_value', {'entity_id': ENTITIES['feeding_duration'], 'value': duration_str})
+    await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
+    await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_duration'], 'value': duration_str})
     
-    ha.increment_counter(ENTITIES['feeding_counter'])
+    await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
 
     await query.edit_message_text("✅ Poppata manuale registrata con successo!", reply_markup=back_button())
     return ConversationHandler.END
 
 # ------------------------------------------------------------------------------
-# GROWTH FLOW HANDLERS
+# GROWTH FLOW
 # ------------------------------------------------------------------------------
-
 async def growth_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -341,7 +330,6 @@ async def growth_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await start(update, context)
         return ConversationHandler.END
 
-    # Mapping button data to entity key and unit
     context.user_data['growth_type'] = data
     
     if data == 'growth_weight':
@@ -359,9 +347,9 @@ async def growth_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return GROWTH_INPUT
 
 async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles text input for growth values."""
-    text = update.message.text.replace(',', '.') # Handle comma decimals
+    text = update.message.text.replace(',', '.')
     growth_type = context.user_data.get('growth_type')
+    hass = get_hass(context)
 
     try:
         value = float(text)
@@ -369,7 +357,6 @@ async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("⛔ Per favore inserisci un numero valido (es. 3.5). Riprova:")
         return GROWTH_INPUT
 
-    # Save to HA
     entity_map = {
         'growth_weight': ENTITIES['weight'],
         'growth_height': ENTITIES['height'],
@@ -377,8 +364,8 @@ async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     }
     
     if growth_type in entity_map:
-        ha.set_value(entity_map[growth_type], value)
-        ha.update_date_time_now(ENTITIES['growth_time'])
+        await hass.services.async_call('input_number', 'set_value', {'entity_id': entity_map[growth_type], 'value': value})
+        await update_timestamp(hass, ENTITIES['growth_time'])
         
         await update.message.reply_text(f"✅ Valore registrato: {value}", reply_markup=main_menu_keyboard())
     else:
@@ -386,51 +373,31 @@ async def growth_input_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
-# ------------------------------------------------------------------------------
-# MAIN
-# ------------------------------------------------------------------------------
 
-if __name__ == '__main__':
-    if not TELEGRAM_TOKEN:
-        print("Error: TELEGRAM_TOKEN not found in environment variables.")
-        exit(1)
-        
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+async def setup_bot(hass: HomeAssistant, token: str):
+    """Initialize and start the bot."""
+    application = ApplicationBuilder().token(token).build()
     
-    # Conversation Handler for Feeding
+    # Inject hass context
+    application.bot_data['hass'] = hass
+    
     feeding_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_callback, pattern='^start_feeding_flow$')],
         states={
-            FEEDING_MENU_STATE: [
-                CallbackQueryHandler(feeding_menu_choice, pattern='^(live_start|manual_entry|main_menu)$')
-            ],
-            LIVE_STOP_SIDE: [
-                CallbackQueryHandler(live_stop_handler, pattern='^(live_stop|side_.*)$')
-            ],
-            MANUAL_TIME: [
-                CallbackQueryHandler(manual_time_choice, pattern='^(time_.*|main_menu)$')
-            ],
-            MANUAL_DURATION: [
-                CallbackQueryHandler(manual_duration_choice, pattern='^(dur_.*|main_menu)$')
-            ],
-            MANUAL_SIDE: [
-                CallbackQueryHandler(manual_side_choice, pattern='^side_.*$')
-            ],
+            FEEDING_MENU_STATE: [CallbackQueryHandler(feeding_menu_choice, pattern='^(live_start|manual_entry|main_menu)$')],
+            LIVE_STOP_SIDE: [CallbackQueryHandler(live_stop_handler, pattern='^(live_stop|side_.*)$')],
+            MANUAL_TIME: [CallbackQueryHandler(manual_time_choice, pattern='^(time_.*|main_menu)$')],
+            MANUAL_DURATION: [CallbackQueryHandler(manual_duration_choice, pattern='^(dur_.*|main_menu)$')],
+            MANUAL_SIDE: [CallbackQueryHandler(manual_side_choice, pattern='^side_.*$')],
         },
         fallbacks=[CommandHandler('start', start), CallbackQueryHandler(start, pattern='^main_menu$')]
     )
 
-    # Conversation Handler for Growth
     growth_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_callback, pattern='^growth_menu$')],
         states={
-            GROWTH_MENU: [
-                CallbackQueryHandler(growth_menu_choice, pattern='^(growth_.*|main_menu)$')
-            ],
-            GROWTH_INPUT: [
-                MessageHandler(filters.TEXT & (~filters.COMMAND), growth_input_handler),
-                CallbackQueryHandler(start, pattern='^main_menu$')
-            ]
+            GROWTH_MENU: [CallbackQueryHandler(growth_menu_choice, pattern='^(growth_.*|main_menu)$')],
+            GROWTH_INPUT: [MessageHandler(filters.TEXT & (~filters.COMMAND), growth_input_handler), CallbackQueryHandler(start, pattern='^main_menu$')]
         },
         fallbacks=[CommandHandler('start', start), CallbackQueryHandler(start, pattern='^main_menu$')]
     )
@@ -438,7 +405,10 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('start', start))
     application.add_handler(feeding_conv)
     application.add_handler(growth_conv)
-    application.add_handler(CallbackQueryHandler(main_menu_callback)) # Fallback for non-conv buttons
+    application.add_handler(CallbackQueryHandler(main_menu_callback))
 
-    print("Bot is running...")
-    application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    
+    return application
