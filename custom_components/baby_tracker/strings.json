@@ -1,0 +1,20 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Baby Tracker Setup",
+                "description": "Connect your Telegram Bot. You need the Token from @BotFather.",
+                "data": {
+                    "telegram_token": "Telegram Bot Token",
+                    "allowed_chat_ids": "Allowed User IDs (comma separated)"
+                }
+            }
+        },
+        "error": {
+            "invalid_auth": "Invalid Token. It usually looks like `123456:ABC-DEF...`"
+        },
+        "abort": {
+            "already_configured": "Baby Tracker is already configured."
+        }
+    }
+}
