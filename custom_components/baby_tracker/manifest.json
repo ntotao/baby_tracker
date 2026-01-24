@@ -11,5 +11,5 @@
     "@ntota"
   ],
   "iot_class": "cloud_polling",
-  "version": "0.3.2"
+  "version": "0.3.3"
 }
