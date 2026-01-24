@@ -1,27 +1,26 @@
-# Baby Tracker Dashboard
+# Baby Tracker Dashboard (Design Pulito)
 # ISTRUZIONI:
-# 1. Crea una nuova Dashboard su Home Assistant.
-# 2. Clicca i tre puntini in alto a destra -> "Modifica Dashboard".
-# 3. Clicca di nuovo i tre puntini -> "Editor configurazione grezza" (Raw configuration editor).
-# 4. Incolla TUTTO questo codice.
+# 1. Copia TUTTO questo codice.
+# 2. Incolla nell'Editor di configurazione grezza (sovrascrivendo tutto).
 
 views:
   - title: Baby Tracker
     icon: mdi:baby-carriage
+    theme: kios
     cards:
       # -------------------------------------------------------------
-      # HEADER STATUS
+      # HEADER: TIMER POPPATA (Grande e Visibile)
       # -------------------------------------------------------------
       - type: tile
         entity: input_boolean.baby_feeding_timer_active
         name: Timer Poppata
         icon: mdi:timer
         color: orange
-        state_content: state
         vertical: false
+        hide_state: false
 
       # -------------------------------------------------------------
-      # RIEPILOGO GIORNALIERO (Grid)
+      # CONTATORI DI OGGI (Griglia Orizzontale)
       # -------------------------------------------------------------
       - type: grid
         columns: 3
@@ -32,51 +31,59 @@ views:
             name: Poppate
             icon: mdi:baby-bottle
             color: blue
+            vertical: true
           
           - type: tile
             entity: counter.baby_diaper_poo_daily
             name: Cacche
             icon: mdi:emoticon-poop
             color: brown
+            vertical: true
           
           - type: tile
             entity: counter.baby_diaper_pee_daily
             name: Pipì
             icon: mdi:water
             color: cyan
+            vertical: true
 
       # -------------------------------------------------------------
-      # DETTAGLI ULTIMI EVENTI
+      # REPORT TESTUALE (Markdown - Niente Caselle di Input!)
       # -------------------------------------------------------------
-      - type: entities
-        title: Dettagli
-        entities:
-          - entity: input_datetime.baby_last_feeding_end
-            name: Fine Poppata
-            secondary_info: last-updated
+      - type: markdown
+        title: Ultimi Eventi
+        content: >
+          <ha-icon icon="mdi:baby-bottle-outline"></ha-icon> **Ultima Poppata**
           
-          - entity: input_text.baby_last_feeding_side
-            name: Lato
-            icon: mdi:format-list-bulleted
+          > **Lato**: {{ states('input_text.baby_last_feeding_side') | upper }}
           
-          - entity: input_text.baby_last_feeding_duration
-            name: Durata
+          > **Durata**: {{ states('input_text.baby_last_feeding_duration') }}
           
-          - entity: input_datetime.baby_last_poo
-            name: Ultima Cacca
-            secondary_info: last-updated
+          > **Quando**: {{ relative_time(states.input_datetime.baby_last_feeding_end.last_updated) }} fa
+          
+          ---
+          
+          <ha-icon icon="mdi:emoticon-poop"></ha-icon> **Ultima Cacca**
+          
+          > **Quando**: {{ relative_time(states.input_datetime.baby_last_poo.last_updated) }} fa
+          
+          ---
+          
+          <ha-icon icon="mdi:water-outline"></ha-icon> **Ultima Pipì**
+          
+          > **Quando**: {{ relative_time(states.input_datetime.baby_last_pee.last_updated) }} fa
 
       # -------------------------------------------------------------
-      # CALENDARIO
+      # CALENDARIO (Lista Compatta)
       # -------------------------------------------------------------
       - type: calendar
-        title: Storico Eventi
+        title: Timeline
         entities:
           - calendar.baby_tracker
         initial_view: listWeek
 
       # -------------------------------------------------------------
-      # GRAFICO CRESCITA
+      # GRAFICI CRESCITA
       # -------------------------------------------------------------
       - type: history-graph
         title: Crescita
@@ -84,5 +91,3 @@ views:
         entities:
           - entity: input_number.baby_weight
             name: Peso
-          - entity: input_number.baby_height
-            name: Altezza
