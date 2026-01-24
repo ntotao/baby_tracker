@@ -1,0 +1,13 @@
+services:
+  baby-tracker-bot:
+    build: ./bot
+    container_name: baby_tracker_bot
+    restart: unless-stopped
+    environment:
+      - HA_URL=http://homeassistant.local:8123  # Change to your HA IP/URL
+      - HA_TOKEN=${HA_TOKEN}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TZ=Europe/Rome
+    volumes:
+      - ./bot:/app
+    network_mode: host  # Use host mode to easily reach HA if on the same machine, otherwise bridge is fine
