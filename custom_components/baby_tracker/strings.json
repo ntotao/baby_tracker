@@ -15,7 +15,8 @@
             "invalid_auth": "Invalid Token. It usually looks like `123456:ABC-DEF...`"
         },
         "abort": {
-            "already_configured": "Baby Tracker is already configured."
+            "already_configured": "Baby Tracker is already configured.",
+            "unknown_error": "Unknown error occurred. Check logs."
         }
     },
     "options": {

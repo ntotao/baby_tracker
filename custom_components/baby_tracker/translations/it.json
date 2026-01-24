@@ -15,7 +15,8 @@
             "invalid_auth": "Il Token non sembra valido. Controlla di averlo copiato tutto!"
         },
         "abort": {
-            "already_configured": "Hai già configurato Baby Tracker."
+            "already_configured": "Hai già configurato Baby Tracker.",
+            "unknown_error": "Errore sconosciuto. Controlla i log di Home Assistant."
         }
     },
     "options": {
