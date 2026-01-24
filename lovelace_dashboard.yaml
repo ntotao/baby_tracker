@@ -1,76 +1,88 @@
-# Baby Tracker Dashboard Example
-# Copia questo codice in una nuova "Vista" (View) della tua Dashboard Lovelace su Home Assistant.
-# Oppure copia le singole card.
+# Baby Tracker Dashboard
+# ISTRUZIONI:
+# 1. Crea una nuova Dashboard su Home Assistant.
+# 2. Clicca i tre puntini in alto a destra -> "Modifica Dashboard".
+# 3. Clicca di nuovo i tre puntini -> "Editor configurazione grezza" (Raw configuration editor).
+# 4. Incolla TUTTO questo codice.
 
-title: Baby Tracker
-icon: mdi:baby-carriage
-cards:
-  # -------------------------------------------------------------
-  # RIEPILOGO GIORNALIERO (Grid)
-  # -------------------------------------------------------------
-  - type: grid
-    columns: 3
-    square: false
+views:
+  - title: Baby Tracker
+    icon: mdi:baby-carriage
     cards:
-      - type: entity
-        entity: counter.baby_feeding_daily
-        name: Poppate
-        icon: mdi:baby-bottle
-        state_color: true
-      
-      - type: entity
-        entity: counter.baby_diaper_poo_daily
-        name: Cacche
-        icon: mdi:emoticon-poop
-        state_color: true
-      
-      - type: entity
-        entity: counter.baby_diaper_pee_daily
-        name: Pipì
-        icon: mdi:water
-        state_color: true
+      # -------------------------------------------------------------
+      # HEADER STATUS
+      # -------------------------------------------------------------
+      - type: tile
+        entity: input_boolean.baby_feeding_timer_active
+        name: Timer Poppata
+        icon: mdi:timer
+        color: orange
+        state_content: state
+        vertical: false
 
-  # -------------------------------------------------------------
-  # STATUS ATTUALE (Entità)
-  # -------------------------------------------------------------
-  - type: entities
-    title: Stato Attuale
-    entities:
-      - entity: input_boolean.baby_feeding_timer_active
-        name: Timer Poppata Live
-        secondary_info: last-updated
-      
-      - entity: input_datetime.baby_last_feeding_end
-        name: Fine Ultima Poppata
-        secondary_info: last-updated
-      
-      - type: attribute
-        entity: input_text.baby_last_feeding_side
-        attribute: min
-        name: Lato Ultima Poppata
-        icon: mdi:format-list-bulleted
-      
-      - entity: input_datetime.baby_last_poo
-        name: Ultima Cacca
-        secondary_info: last-updated
+      # -------------------------------------------------------------
+      # RIEPILOGO GIORNALIERO (Grid)
+      # -------------------------------------------------------------
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: counter.baby_feeding_daily
+            name: Poppate
+            icon: mdi:baby-bottle
+            color: blue
+          
+          - type: tile
+            entity: counter.baby_diaper_poo_daily
+            name: Cacche
+            icon: mdi:emoticon-poop
+            color: brown
+          
+          - type: tile
+            entity: counter.baby_diaper_pee_daily
+            name: Pipì
+            icon: mdi:water
+            color: cyan
 
-  # -------------------------------------------------------------
-  # CALENDARIO (Timeline)
-  # -------------------------------------------------------------
-  - type: calendar
-    title: Storico Eventi
-    entities:
-      - calendar.baby_tracker
-    initial_view: dayGridMonth  # Oppure 'listWeek' per la lista
+      # -------------------------------------------------------------
+      # DETTAGLI ULTIMI EVENTI
+      # -------------------------------------------------------------
+      - type: entities
+        title: Dettagli
+        entities:
+          - entity: input_datetime.baby_last_feeding_end
+            name: Fine Poppata
+            secondary_info: last-updated
+          
+          - entity: input_text.baby_last_feeding_side
+            name: Lato
+            icon: mdi:format-list-bulleted
+          
+          - entity: input_text.baby_last_feeding_duration
+            name: Durata
+          
+          - entity: input_datetime.baby_last_poo
+            name: Ultima Cacca
+            secondary_info: last-updated
 
-  # -------------------------------------------------------------
-  # CRESCITA (Grafico)
-  # -------------------------------------------------------------
-  - type: history-graph
-    title: Grafico Crescita
-    hours_to_show: 720  # 30 Giorni
-    entities:
-      - entity: input_number.baby_weight
-        name: Peso
-      - entity: input_number.baby_height
-        name: Altezza
+      # -------------------------------------------------------------
+      # CALENDARIO
+      # -------------------------------------------------------------
+      - type: calendar
+        title: Storico Eventi
+        entities:
+          - calendar.baby_tracker
+        initial_view: listWeek
+
+      # -------------------------------------------------------------
+      # GRAFICO CRESCITA
+      # -------------------------------------------------------------
+      - type: history-graph
+        title: Crescita
+        hours_to_show: 720
+        entities:
+          - entity: input_number.baby_weight
+            name: Peso
+          - entity: input_number.baby_height
+            name: Altezza
