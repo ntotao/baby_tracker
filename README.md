@@ -2,7 +2,7 @@
 
 **Trasforma il caos in dati!** Perché cercare di ricordare a che ora è stata l'ultima poppata quando puoi chiederlo a un bot?
 
-**Baby Tracker** è l'integrazione per **Home Assistant** che ti permette di loggare pannolini, poppate e crescita direttamente da **Telegram**. Perché ammettiamolo, hai il telefono in mano anche alle 3 di notte mentre cull il pupo.
+**Baby Tracker** è l'integrazione per **Home Assistant** che ti permette di loggare pannolini, poppate e crescita direttamente da **Telegram**. Perché ammettiamolo, hai il telefono in mano anche alle 3 di notte mentre culli il pupo.
 
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)
 ![Sleep](https://img.shields.io/badge/Sleep-Optional-red.svg)
@@ -38,7 +38,7 @@ Dobbiamo dire ad Home Assistant dove mettere i dati (perché il database SQL non
 ### 2. HACS Attack
 1.  Apri HACS.
 2.  Menu (tre puntini) -> "Repository Personalizzati".
-3.  Incolla il link del tuo repo: `https://github.com/TUO_USERNAME/baby_tracker`.
+3.  Incolla il link del repo: `https://github.com/ntotao/baby_tracker`.
 4.  Categoria: "Integration".
 5.  Installa. Riavvia. Solita roba.
 
