@@ -73,6 +73,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             ["calendar", "sensor", "binary_sensor"]
         )
         
+        # Register Services (v1.1.0)
+        async def handle_start_feeding(call):
+            coordinator.start_feeding()
+        
+        async def handle_stop_feeding(call):
+            coordinator.stop_feeding()
+            
+        hass.services.async_register(DOMAIN, "start_feeding", handle_start_feeding)
+        hass.services.async_register(DOMAIN, "stop_feeding", handle_stop_feeding)
+
         # Listen for updates to options
         entry.async_on_unload(entry.add_update_listener(update_listener))
         

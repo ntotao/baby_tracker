@@ -16,7 +16,7 @@ views:
       # APP EXPERIENCE (Custom Card)
       # -------------------------------------------------------------
       - type: custom:baby-tracker-card
-        entity: input_boolean.baby_feeding_timer_active
+        entity: binary_sensor.baby_tracker_allattamento_in_corso
         
       # -------------------------------------------------------------
       # HISTORY & TIMELINE
