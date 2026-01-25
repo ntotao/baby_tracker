@@ -53,11 +53,14 @@ def get_hass(context: ContextTypes.DEFAULT_TYPE) -> HomeAssistant:
     """Retrieve hass instance from bot_data."""
     return context.bot_data.get('hass')
 
-def get_store(context: ContextTypes.DEFAULT_TYPE):
-    """Retrieve EventStore instance."""
+def get_coordinator(context: ContextTypes.DEFAULT_TYPE):
+    """Retrieve Coordinator instance."""
     hass = get_hass(context)
     entry_id = context.bot_data.get('entry_id')
-    return hass.data[DOMAIN].get(entry_id + "_store")
+    return hass.data[DOMAIN].get(entry_id)
+
+... (This replace is too big to do in one chunks reliably, I will use multi_replace for targeted fixes)
+
 
 def check_access(func):
     """Decorator to check if user has access."""
@@ -105,9 +108,9 @@ async def update_timestamp(hass: HomeAssistant, entity_id: str, dt: datetime = N
     )
 
 async def log_event(context: ContextTypes.DEFAULT_TYPE, event_type: str, summary: str, start_dt: datetime, end_dt: datetime = None, description: str = ""):
-    """Log an event to the EventStore (Calendar)."""
-    store = get_store(context)
-    if store:
+    """Log an event to the Coordinator."""
+    coord = get_coordinator(context)
+    if coord:
         event = BabyEvent(
             type=event_type,
             start=start_dt,
@@ -115,7 +118,7 @@ async def log_event(context: ContextTypes.DEFAULT_TYPE, event_type: str, summary
             summary=summary,
             description=description
         )
-        await store.add_event(event)
+        await coord.async_add_event(event)
 
 # ------------------------------------------------------------------------------
 # HANDLERS
@@ -150,8 +153,8 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
     
     if data == 'start_feeding_flow':
-        state = hass.states.get(ENTITIES['feeding_active'])
-        is_active = state and state.state == 'on'
+        coord = get_coordinator(context)
+        is_active = coord.is_feeding if coord else False
         
         if is_active:
             keyboard = [[InlineKeyboardButton("⏹️ STOP Poppata", callback_data='live_stop')]]
@@ -189,22 +192,17 @@ async def handle_diaper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
     
     if data == 'diaper_poo':
-        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
-        await update_timestamp(hass, ENTITIES['poo_time'], now)
+        # Coordinator auto-updates state on event add
         await log_event(context, "poo", "💩 Cacca", now)
         await query.edit_message_text("✅ Registrata Cacca!", reply_markup=back_button())
     
     elif data == 'diaper_pee':
-        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
-        await update_timestamp(hass, ENTITIES['pee_time'], now)
+        # Coordinator auto-updates state on event add
         await log_event(context, "pee", "💧 Pipì", now)
         await query.edit_message_text("✅ Registrata Pipì!", reply_markup=back_button())
 
     elif data == 'diaper_both':
-        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
-        await update_timestamp(hass, ENTITIES['poo_time'], now)
-        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
-        await update_timestamp(hass, ENTITIES['pee_time'], now)
+        # Coordinator auto-updates state on event add
         await log_event(context, "diaper", "💩+💧 Misto", now)
         await query.edit_message_text("✅ Registrato Cambio Completo!", reply_markup=back_button())
 
@@ -264,8 +262,8 @@ async def feeding_menu_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
 
     if data == 'live_start':
-        await hass.services.async_call('input_boolean', 'turn_on', {'entity_id': ENTITIES['feeding_active']})
-        await update_timestamp(hass, ENTITIES['feeding_start'])
+        coord = get_coordinator(context)
+        if coord: coord.start_feeding()
         
         keyboard = [[InlineKeyboardButton("⏹️ STOP Poppata", callback_data='live_stop')]]
         await query.edit_message_text("▶️ Poppata AVVIATA! Premi Stop quando finito.", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -294,8 +292,8 @@ async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if data == 'live_stop':
-        await hass.services.async_call('input_boolean', 'turn_off', {'entity_id': ENTITIES['feeding_active']})
-        await update_timestamp(hass, ENTITIES['feeding_end'])
+        coord = get_coordinator(context)
+        if coord: coord.stop_feeding()
         
         keyboard = [
             [InlineKeyboardButton("Sinistra (SX)", callback_data='side_sx'),
@@ -308,14 +306,13 @@ async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith('side_'):
         side = data.replace('side_', '')
-        await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
-        await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
+        # We don't need input_text anymore, we just log the event with data
         
+        coord = get_coordinator(context)
         # Calculate duration
-        start_state = hass.states.get(ENTITIES['feeding_start'])
-        end_state = hass.states.get(ENTITIES['feeding_end'])
-        start_dt = datetime.fromtimestamp(start_state.attributes['timestamp'])
-        end_dt = datetime.fromtimestamp(end_state.attributes['timestamp'])
+        start_dt = coord.feeding_start_time if coord and coord.feeding_start_time else datetime.now()
+        end_dt = datetime.now()
+        
         duration = int((end_dt - start_dt).total_seconds() / 60)
         desc = f"Lato: {side}, Durata: {duration} min"
 
@@ -398,14 +395,6 @@ async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     desc = f"Lato: {side}, Durata: {duration_str}"
 
-    await update_timestamp(hass, ENTITIES['feeding_start'], start_dt)
-    await update_timestamp(hass, ENTITIES['feeding_end'], end_dt)
-    
-    await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_side'], 'value': side})
-    await hass.services.async_call('input_text', 'set_value', {'entity_id': ENTITIES['feeding_duration'], 'value': duration_str})
-    
-    await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
-    
     await log_event(context, "feeding", "🍼 Poppata", start_dt, end_dt, desc)
 
     await query.edit_message_text("✅ Poppata manuale registrata con successo!", reply_markup=back_button())

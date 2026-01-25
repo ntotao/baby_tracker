@@ -68,7 +68,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         hass.data[DOMAIN][entry.entry_id + "_bot"] = application
         
         # Forward setup
-        await hass.config_entries.async_forward_entry_setups(entry, ["calendar"])
+        await hass.config_entries.async_forward_entry_setups(
+            entry, 
+            ["calendar", "sensor", "binary_sensor"]
+        )
         
         # Listen for updates to options
         entry.async_on_unload(entry.add_update_listener(update_listener))

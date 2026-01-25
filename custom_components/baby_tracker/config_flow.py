@@ -27,7 +27,7 @@ class BabyTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            token = user_input[CONF_TELEGRAM_TOKEN]
+            token = user_input.get(CONF_TELEGRAM_TOKEN)
             
             # Simple validation
             if not token or ":" not in token:
@@ -39,7 +39,7 @@ class BabyTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema({
                 vol.Required(CONF_TELEGRAM_TOKEN): str,
-                vol.Required(CONF_ALLOWED_CHAT_IDS, default=""): str,
+                vol.Optional(CONF_ALLOWED_CHAT_IDS, default=""): str,
                 vol.Optional(CONF_BABY_NAME, default="Baby"): str,
             }),
             errors=errors,
@@ -68,24 +68,27 @@ class BabyTrackerOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        # Config Entry Options take precedence, fallback to Config Entry Data, then Default
-        ids_default = self.config_entry.options.get(
-            CONF_ALLOWED_CHAT_IDS, 
-            self.config_entry.data.get(CONF_ALLOWED_CHAT_IDS, "")
-        )
-        name_default = self.config_entry.options.get(
-            CONF_BABY_NAME, 
-            self.config_entry.data.get(CONF_BABY_NAME, "Baby")
-        )
+        # Robust retrieval: Look in options first, then data, then empty string default
+        # The key is to handle the case where keys are MISSING entirely
+        
+        # 1. Chat IDs
+        ids_opt = self.config_entry.options.get(CONF_ALLOWED_CHAT_IDS)
+        ids_data = self.config_entry.data.get(CONF_ALLOWED_CHAT_IDS)
+        current_ids = ids_opt if ids_opt is not None else ids_data
+        if current_ids is None: current_ids = ""
+        current_ids = str(current_ids)
 
-        # Ensure strict strings for UI
-        ids_default = str(ids_default) if ids_default is not None else ""
-        name_default = str(name_default) if name_default is not None else "Baby"
+        # 2. Baby Name
+        name_opt = self.config_entry.options.get(CONF_BABY_NAME)
+        name_data = self.config_entry.data.get(CONF_BABY_NAME)
+        current_name = name_opt if name_opt is not None else name_data
+        if current_name is None: current_name = "Baby"
+        current_name = str(current_name)
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Required(CONF_ALLOWED_CHAT_IDS, default=ids_default): str,
-                vol.Optional(CONF_BABY_NAME, default=name_default): str,
+                vol.Optional(CONF_ALLOWED_CHAT_IDS, default=current_ids): str,
+                vol.Optional(CONF_BABY_NAME, default=current_name): str,
             }),
         )
