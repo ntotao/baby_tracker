@@ -5,6 +5,8 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, CONF_TELEGRAM_TOKEN, CONF_ALLOWED_CHAT_IDS, CONF_BABY_NAME
 from .bot import setup_bot
+from .event_store import EventStore
+from .coordinator import BabyTrackerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,10 +16,11 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Baby Tracker from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+
     token = entry.data.get(CONF_TELEGRAM_TOKEN)
     
-    # Merge options into data-like structure. 
-    # Options take precedence over Data (initial setup).
+    # Options + Data merge logic
     allowed_ids_str = entry.options.get(CONF_ALLOWED_CHAT_IDS, entry.data.get(CONF_ALLOWED_CHAT_IDS, ""))
     baby_name = entry.options.get(CONF_BABY_NAME, entry.data.get(CONF_BABY_NAME, "Baby"))
     
@@ -32,17 +35,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.error("Telegram Token not found in config entry")
         return False
 
-    _LOGGER.info("Starting %s Tracker Bot...", baby_name)
+    # 1. Initialize Store
+    store = EventStore(hass, entry.entry_id)
+    await store.async_load()
+
+    # 2. Initialize Coordinator
+    coordinator = BabyTrackerCoordinator(hass, store)
+    # Perform first refresh (lazy load check)
+    await coordinator.async_config_entry_first_refresh()
+
+    # Store references
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+    # Keep store accessible efficiently if needed, or just access via coordinator
+    hass.data[DOMAIN][entry.entry_id + "_store"] = store 
+
+    _LOGGER.info("Starting %s Tracker Bot... (v2.0)", baby_name)
     
-    # Start Bot
+    # 3. Start Bot
     try:
-        # Pass entry_id so bot can find the store
         application = await setup_bot(hass, token, allowed_ids, entry.entry_id, baby_name)
+        hass.data[DOMAIN][entry.entry_id + "_bot"] = application
         
-        hass.data.setdefault(DOMAIN, {})
-        hass.data[DOMAIN][entry.entry_id] = application
-        
-        # Forward setup of calendar platform
+        # Forward setup
         await hass.config_entries.async_forward_entry_setups(entry, ["calendar"])
         
         # Listen for updates to options
@@ -56,14 +70,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
-    application = hass.data[DOMAIN].pop(entry.entry_id)
-    
-    if application:
+    # Stop Bot
+    if bot_app := hass.data[DOMAIN].pop(entry.entry_id + "_bot", None):
         _LOGGER.info("Stopping Baby Tracker Bot...")
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
-        
+        await bot_app.updater.stop()
+        await bot_app.stop()
+        await bot_app.shutdown()
+    
+    # Remove data
+    hass.data[DOMAIN].pop(entry.entry_id, None)       # Coordinator
+    hass.data[DOMAIN].pop(entry.entry_id + "_store", None) # Store
+
     return await hass.config_entries.async_unload_platforms(entry, ["calendar"])
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry):

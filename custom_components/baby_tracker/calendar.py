@@ -14,14 +14,13 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     """Set up the Baby Tracker calendar platform."""
     
-    # Create Store
-    store = EventStore(hass, entry.entry_id)
-    await store.async_load()
+    # Retrieve Store initialized in __init__.py
+    store = hass.data[DOMAIN].get(entry.entry_id + "_store")
     
-    # Store reference to store in hass.data so bot can access it
-    # note: init.py creates the main dict
-    hass.data[DOMAIN][entry.entry_id + "_store"] = store
-    
+    if not store:
+        _LOGGER.error("Event Store not found for calendar setup!")
+        return
+        
     async_add_entities([BabyTrackerCalendar(store, entry)], True)
 
 
@@ -38,7 +37,6 @@ class BabyTrackerCalendar(CalendarEntity):
     @property
     def event(self):
         """Return the next upcoming event."""
-        # Not strictly needed for simple logging, can return None
         return None
 
     async def async_get_events(self, hass, start_date, end_date):
@@ -48,11 +46,12 @@ class BabyTrackerCalendar(CalendarEntity):
         
         calendar_events = []
         for ev in stored_events:
+            # BabyEvent is an object now, not a dict
             calendar_events.append(CalendarEvent(
-                summary=ev["summary"],
-                start=ev["start"],
-                end=ev["end"],
-                description=ev["description"]
+                summary=ev.summary,
+                start=ev.start,
+                end=ev.end if ev.end else ev.start + timedelta(minutes=1), # Ensure duration for point events
+                description=ev.description
             ))
             
         return calendar_events

@@ -14,6 +14,7 @@ from telegram.ext import (
 )
 from homeassistant.core import HomeAssistant
 from .const import DOMAIN
+from .models import BabyEvent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,11 +104,18 @@ async def update_timestamp(hass: HomeAssistant, entity_id: str, dt: datetime = N
         {'entity_id': entity_id, 'timestamp': dt.timestamp()}
     )
 
-async def log_event(context: ContextTypes.DEFAULT_TYPE, summary: str, start_dt: datetime, end_dt: datetime = None, description: str = ""):
+async def log_event(context: ContextTypes.DEFAULT_TYPE, event_type: str, summary: str, start_dt: datetime, end_dt: datetime = None, description: str = ""):
     """Log an event to the EventStore (Calendar)."""
     store = get_store(context)
     if store:
-        await store.add_event(summary, start_dt, end_dt, description)
+        event = BabyEvent(
+            type=event_type,
+            start=start_dt,
+            end=end_dt,
+            summary=summary,
+            description=description
+        )
+        await store.add_event(event)
 
 # ------------------------------------------------------------------------------
 # HANDLERS
@@ -183,13 +191,13 @@ async def handle_diaper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == 'diaper_poo':
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['poo_counter']})
         await update_timestamp(hass, ENTITIES['poo_time'], now)
-        await log_event(context, "💩 Cacca", now)
+        await log_event(context, "poo", "💩 Cacca", now)
         await query.edit_message_text("✅ Registrata Cacca!", reply_markup=back_button())
     
     elif data == 'diaper_pee':
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
         await update_timestamp(hass, ENTITIES['pee_time'], now)
-        await log_event(context, "💧 Pipì", now)
+        await log_event(context, "pee", "💧 Pipì", now)
         await query.edit_message_text("✅ Registrata Pipì!", reply_markup=back_button())
 
     elif data == 'diaper_both':
@@ -197,7 +205,7 @@ async def handle_diaper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update_timestamp(hass, ENTITIES['poo_time'], now)
         await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['pee_counter']})
         await update_timestamp(hass, ENTITIES['pee_time'], now)
-        await log_event(context, "💩+💧 Misto", now)
+        await log_event(context, "diaper", "💩+💧 Misto", now)
         await query.edit_message_text("✅ Registrato Cambio Completo!", reply_markup=back_button())
 
 async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -311,7 +319,7 @@ async def live_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duration = int((end_dt - start_dt).total_seconds() / 60)
         desc = f"Lato: {side}, Durata: {duration} min"
 
-        await log_event(context, "🍼 Poppata", start_dt, end_dt, desc)
+        await log_event(context, "feeding", "🍼 Poppata", start_dt, end_dt, desc)
         
         await query.edit_message_text(f"✅ Poppata registrata! ({duration} min)", reply_markup=back_button())
         return ConversationHandler.END
@@ -398,7 +406,7 @@ async def manual_side_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await hass.services.async_call('counter', 'increment', {'entity_id': ENTITIES['feeding_counter']})
     
-    await log_event(context, "🍼 Poppata", start_dt, end_dt, desc)
+    await log_event(context, "feeding", "🍼 Poppata", start_dt, end_dt, desc)
 
     await query.edit_message_text("✅ Poppata manuale registrata con successo!", reply_markup=back_button())
     return ConversationHandler.END
