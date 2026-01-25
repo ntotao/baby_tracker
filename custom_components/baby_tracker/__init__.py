@@ -10,8 +10,16 @@ from .coordinator import BabyTrackerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+import os
+
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the Baby Tracker component."""
+    # Serve the 'www' directory at /baby_tracker_assets
+    hass.http.register_static_path(
+        "/baby_tracker_assets",
+        hass.config.path("custom_components/baby_tracker/www"),
+        cache_headers=False
+    )
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):

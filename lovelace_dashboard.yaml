@@ -1,93 +1,39 @@
-# Baby Tracker Dashboard (Design Pulito)
+# Baby Tracker 2.0 Dashboard
 # ISTRUZIONI:
-# 1. Copia TUTTO questo codice.
-# 2. Incolla nell'Editor di configurazione grezza (sovrascrivendo tutto).
+# 1. Copia questo file in una nuova vista (Modifica Dashboard -> Raw Editor).
+# 2. IMPORTANTE: Devi aggiungere la Risorsa Lovelace:
+#    - Vai su Impostazioni -> Dashboard -> Tre puntini -> Risorse
+#    - Aggiungi Risorsa: /baby_tracker_assets/baby-tracker-card.js
+#    - Tipo: JavaScript Module
 
 views:
-  - title: Baby Tracker
-    icon: mdi:baby-carriage
-    theme: kios
+  - title: Baby App
+    icon: mdi:baby-face-outline
+    theme: ios-dark-mode-blue-red # Consigliato un tema scuro
+    panel: false
     cards:
       # -------------------------------------------------------------
-      # HEADER: TIMER POPPATA (Grande e Visibile)
+      # APP EXPERIENCE (Custom Card)
       # -------------------------------------------------------------
-      - type: tile
+      - type: custom:baby-tracker-card
         entity: input_boolean.baby_feeding_timer_active
-        name: Timer Poppata
-        icon: mdi:timer
-        color: orange
-        vertical: false
-        hide_state: false
-
+        
       # -------------------------------------------------------------
-      # CONTATORI DI OGGI (Griglia Orizzontale)
+      # HISTORY & TIMELINE
       # -------------------------------------------------------------
       - type: grid
-        columns: 3
+        columns: 1
         square: false
         cards:
-          - type: tile
-            entity: counter.baby_feeding_daily
-            name: Poppate
-            icon: mdi:baby-bottle
-            color: blue
-            vertical: true
-          
-          - type: tile
-            entity: counter.baby_diaper_poo_daily
-            name: Cacche
-            icon: mdi:emoticon-poop
-            color: brown
-            vertical: true
-          
-          - type: tile
-            entity: counter.baby_diaper_pee_daily
-            name: Pipì
-            icon: mdi:water
-            color: cyan
-            vertical: true
-
-      # -------------------------------------------------------------
-      # REPORT TESTUALE (Markdown - Niente Caselle di Input!)
-      # -------------------------------------------------------------
-      - type: markdown
-        title: Ultimi Eventi
-        content: >
-          <ha-icon icon="mdi:baby-bottle-outline"></ha-icon> **Ultima Poppata**
-          
-          > **Lato**: {{ states('input_text.baby_last_feeding_side') | upper }}
-          
-          > **Durata**: {{ states('input_text.baby_last_feeding_duration') }}
-          
-          > **Quando**: {{ relative_time(states.input_datetime.baby_last_feeding_end.last_updated) }} fa
-          
-          ---
-          
-          <ha-icon icon="mdi:emoticon-poop"></ha-icon> **Ultima Cacca**
-          
-          > **Quando**: {{ relative_time(states.input_datetime.baby_last_poo.last_updated) }} fa
-          
-          ---
-          
-          <ha-icon icon="mdi:water-outline"></ha-icon> **Ultima Pipì**
-          
-          > **Quando**: {{ relative_time(states.input_datetime.baby_last_pee.last_updated) }} fa
-
-      # -------------------------------------------------------------
-      # CALENDARIO (Lista Compatta)
-      # -------------------------------------------------------------
-      - type: calendar
-        title: Timeline
-        entities:
-          - calendar.baby_tracker
-        initial_view: listWeek
-
-      # -------------------------------------------------------------
-      # GRAFICI CRESCITA
-      # -------------------------------------------------------------
-      - type: history-graph
-        title: Crescita
-        hours_to_show: 720
-        entities:
-          - entity: input_number.baby_weight
-            name: Peso
+          - type: calendar
+            title: Timeline Eventi
+            entities:
+              - calendar.baby_tracker
+            initial_view: listWeek
+            
+          - type: history-graph
+            title: Grafico Peso
+            hours_to_show: 720
+            entities:
+              - entity: input_number.baby_weight
+                name: Peso (kg)
