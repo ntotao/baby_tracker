@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # States
-SELECT_TYPE, SELECT_TIME, INPUT_CUSTOM_TIME = range(3)
+SELECT_TYPE, SELECT_TIME, INPUT_CUSTOM_TIME, INPUT_VALUE = range(4)
 
 async def manual_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -22,7 +22,9 @@ async def manual_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("👈 Tetta SX", callback_data='manual_type_feed_left'),
          InlineKeyboardButton("👉 Tetta DX", callback_data='manual_type_feed_right')],
         [InlineKeyboardButton("🍼 Biberon", callback_data='manual_type_feed_bottle')],
-        [InlineKeyboardButton("❌ Annulla", callback_data='manual_cancel')]
+        [InlineKeyboardButton("⚖️ Peso", callback_data='manual_type_weight'),
+         InlineKeyboardButton("📏 Altezza", callback_data='manual_type_height')],
+        [InlineKeyboardButton("❌ Annulla", callback_data='manual_menu_cancel')]
     ]
     
     text = "📝 *Inserimento Manuale*\nCosa vuoi registrare?"
@@ -40,7 +42,9 @@ async def select_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == 'manual_cancel':
-        await query.edit_message_text("Operazione annullata.")
+        await query.answer("Annullato.")
+        from src.app.bot.handlers.tracking import menu_handler
+        await menu_handler(update, context)
         return ConversationHandler.END
         
     event_type_raw = data.replace('manual_type_', '')
@@ -58,6 +62,18 @@ async def select_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         source = event_type_raw.replace('feed_', '')
         details = {'source': source, 'manual': True}
         
+    elif event_type_raw == 'weight':
+        event_type = 'misurazione_peso'
+        context.user_data['manual_event'] = {'type': event_type, 'details': {}}
+        await query.edit_message_text("⚖️ Inserisci il peso in **grammi** (es. 4500):", parse_mode='Markdown')
+        return INPUT_VALUE
+
+    elif event_type_raw == 'height':
+        event_type = 'misurazione_altezza'
+        context.user_data['manual_event'] = {'type': event_type, 'details': {}}
+        await query.edit_message_text("📏 Inserisci l'altezza in **cm** (es. 55):", parse_mode='Markdown')
+        return INPUT_VALUE
+
     context.user_data['manual_event'] = {
         'type': event_type,
         'details': details
@@ -86,7 +102,9 @@ async def select_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == 'manual_cancel':
-        await query.edit_message_text("Operazione annullata.")
+        await query.answer("Annullato.")
+        from src.app.bot.handlers.tracking import menu_handler
+        await menu_handler(update, context)
         return ConversationHandler.END
         
     if data == 'manual_time_custom':
@@ -127,6 +145,29 @@ async def input_custom_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Formato non valido. Riprova (es: 14:30):")
         return INPUT_CUSTOM_TIME
 
+async def input_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    value_text = update.message.text.strip()
+    try:
+        value = int(value_text)
+        context.user_data['manual_event']['details']['value'] = value
+        
+        # Now ask for time
+        keyboard = [
+            [InlineKeyboardButton("Adesso", callback_data='manual_time_now')],
+            [InlineKeyboardButton("-15 min", callback_data='manual_time_15'),
+             InlineKeyboardButton("✍️ Data/Ora", callback_data='manual_time_custom')],
+            [InlineKeyboardButton("❌ Annulla", callback_data='manual_cancel')]
+        ]
+        await update.message.reply_text(
+            f"Valore registrato: {value}. Quando?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+        return SELECT_TIME
+    except ValueError:
+        await update.message.reply_text("⚠️ Inserisci un numero valido.")
+        return INPUT_VALUE
+
 async def save_event(update: Update, context: ContextTypes.DEFAULT_TYPE, timestamp: datetime.datetime):
     event_data = context.user_data.get('manual_event')
     if not event_data:
@@ -166,9 +207,10 @@ manual_log_handler = ConversationHandler(
         CallbackQueryHandler(manual_start, pattern='^start_manual_log$')
     ],
     states={
-        SELECT_TYPE: [CallbackQueryHandler(select_type, pattern='^manual_type_|manual_cancel')],
+        SELECT_TYPE: [CallbackQueryHandler(select_type, pattern='^manual_type_|manual_cancel|manual_menu_cancel')],
         SELECT_TIME: [CallbackQueryHandler(select_time, pattern='^manual_time_|manual_cancel')],
-        INPUT_CUSTOM_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_custom_time)]
+        INPUT_CUSTOM_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_custom_time)],
+        INPUT_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_value)]
     },
     fallbacks=[CommandHandler("cancel", manual_start)] # Should implement real cancel
 )

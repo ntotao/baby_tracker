@@ -102,8 +102,31 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
              await query.answer(f"✅ Poppata terminata: {duration_min} min", show_alert=True)
              await menu_handler(update, context)
 
+        elif data == 'feed_log_bottle':
+             # Show ML options
+             keyboard = [
+                 [InlineKeyboardButton("20 ml", callback_data='feed_bottle_20'),
+                  InlineKeyboardButton("30 ml", callback_data='feed_bottle_30')],
+                 [InlineKeyboardButton("60 ml", callback_data='feed_bottle_60'),
+                  InlineKeyboardButton("90 ml", callback_data='feed_bottle_90')],
+                 [InlineKeyboardButton("120 ml", callback_data='feed_bottle_120')], 
+                 [InlineKeyboardButton("🔙 Indietro", callback_data='menu_feeding')]
+             ]
+             await query.edit_message_text(
+                 "🍼 *Biberon*\nQuanto latte?",
+                 reply_markup=InlineKeyboardMarkup(keyboard),
+                 parse_mode='Markdown'
+             )
+
+        elif data.startswith('feed_bottle_'):
+             ml = data.replace('feed_bottle_', '')
+             details = {'source': 'bottle', 'quantity_ml': ml}
+             await event_service.add_event(tenant.id, user_id, 'allattamento', details)
+             await query.answer(f"🍼 Biberon {ml}ml registrato!", show_alert=False)
+             await menu_handler(update, context)
+
         elif data.startswith('feed_log_'):
-            # Instant log (bottle/manual side without timer)
+            # Instant log (manual side without timer)
             feed_type = data.replace('feed_log_', '')
             details = {'source': feed_type}
             await event_service.add_event(tenant.id, user_id, 'allattamento', details)
@@ -214,7 +237,9 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
             dur = e.details.get('duration_text', '')
             if src == 'left': detail_str = f" (👈 {dur})"
             elif src == 'right': detail_str = f" (👉 {dur})"
-            elif src == 'bottle': detail_str = " (🍼)"
+            elif src == 'bottle':
+                 ml = e.details.get('quantity_ml', '?')
+                 detail_str = f" (🍼 {ml}ml)"
             else: detail_str = f" ({src})"
             
         icon = "⚪️"
