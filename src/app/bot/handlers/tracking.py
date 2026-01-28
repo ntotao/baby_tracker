@@ -55,7 +55,7 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         event_service = EventService(db)
         
         # --- QUICK ACTIONS (Toast Notification Only) ---
-        elif data == 'track_cacca':
+        if data == 'track_cacca':
             await event_service.add_event(tenant.id, user_id, 'cacca')
             await query.answer("💩 Cacca registrata!", show_alert=False) 
             
