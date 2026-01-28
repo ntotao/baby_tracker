@@ -11,11 +11,12 @@ async def create_bot() -> Application:
     app = ApplicationBuilder().token(settings.TELEGRAM_TOKEN).build()
     
     # Register handlers
-    from src.app.bot.handlers.onboarding import start_handler, register_handler
+    from src.app.bot.handlers.onboarding import start_handler, register_handler, invite_command
     from src.app.bot.handlers.tracking import menu_cmd_handler, track_handler, back_handler
     
     app.add_handler(start_handler)
     app.add_handler(register_handler)
+    app.add_handler(CommandHandler("invite", invite_command))
     app.add_handler(menu_cmd_handler)
     app.add_handler(track_handler)
     app.add_handler(back_handler)

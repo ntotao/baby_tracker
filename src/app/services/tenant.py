@@ -39,3 +39,20 @@ class TenantService:
         await self.db.commit()
         await self.db.refresh(new_tenant)
         return new_tenant
+
+    async def add_user_to_tenant(self, tenant_id: str, user_id: int) -> bool:
+        stmt = select(Tenant).where(Tenant.id == tenant_id)
+        result = await self.db.execute(stmt)
+        tenant = result.scalar_one_or_none()
+        
+        if not tenant:
+            return False
+            
+        current_users = list(tenant.allowed_users)  # Copy to list
+        if user_id not in current_users:
+            current_users.append(user_id)
+            tenant.allowed_users = current_users  # Reassign to trigger update
+            self.db.add(tenant)
+            await self.db.commit()
+            
+        return True
