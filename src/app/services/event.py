@@ -11,12 +11,13 @@ class EventService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def add_event(self, tenant_id: str, user_id: int, event_type: str, details: dict = {}) -> Event:
+    async def add_event(self, tenant_id: str, user_id: int, event_type: str, details: dict = {}, timestamp: datetime = None) -> Event:
         new_event = Event(
             tenant_id=tenant_id,
             user_id=user_id,
             event_type=event_type,
-            details=details
+            details=details,
+            timestamp=timestamp # None means DB will use default (now)
         )
         self.db.add(new_event)
         await self.db.commit()

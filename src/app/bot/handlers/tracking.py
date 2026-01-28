@@ -14,6 +14,7 @@ async def get_main_menu_keyboard():
          InlineKeyboardButton("💧 Pipì", callback_data='track_pipi')],
         [InlineKeyboardButton("💩+💧 Entrambi", callback_data='track_entrambi')],
         [InlineKeyboardButton("🍼 Allattamento", callback_data='menu_feeding')],
+        [InlineKeyboardButton("📝 Inserimento Manuale", callback_data='start_manual_log')],
         [InlineKeyboardButton("📊 Stato Oggi", callback_data='view_status')]
     ])
 
