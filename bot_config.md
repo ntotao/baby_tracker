@@ -40,9 +40,6 @@ Funzionalità:
 Premi /start per iniziare!
 ```
 
-Premi /start per iniziare!
-```
-
 ## 3. Edit About
 Send `/setabout` to BotFather. This appears in the profile info.
 
@@ -50,9 +47,7 @@ Send `/setabout` to BotFather. This appears in the profile info.
 Baby Tracker Bot v1.0
 Traccia eventi e crescita del tuo bambino.
 Supporta condivisione account per genitori.
-Crea il tuo tracker condiviso ora!
 ```
 
 ## 4. Edit User Picture
 Send `/setuserpic` to set the bot's profile image.
-(Use the logo generated previously if available, or ask me to generate one!)
