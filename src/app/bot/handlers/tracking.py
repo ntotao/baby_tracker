@@ -55,7 +55,7 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         event_service = EventService(db)
         
         # --- QUICK ACTIONS (Toast Notification Only) ---
-        if data == 'track_cacca':
+        elif data == 'track_cacca':
             await event_service.add_event(tenant.id, user_id, 'cacca')
             await query.answer("💩 Cacca registrata!", show_alert=False) 
             
@@ -84,7 +84,7 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif data == 'feed_timer_stop':
              if 'feeding_start' not in context.user_data:
-                 await query.answer("Nessun timer attivo.", show_alert=True)
+                 await query.answer("Nessun timer attivo.", show_alert=False) # Changed
                  await menu_handler(update, context)
                  return
                  
@@ -99,7 +99,7 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
              }
              
              await event_service.add_event(tenant.id, user_id, 'allattamento', details)
-             await query.answer(f"✅ Poppata terminata: {duration_min} min", show_alert=True)
+             await query.answer(f"✅ Poppata: {duration_min} min", show_alert=False) # Changed
              await menu_handler(update, context)
 
         elif data == 'feed_log_bottle':
@@ -140,10 +140,10 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data == 'delete_last_event':
             success = await event_service.delete_last_event(tenant.id)
             if success:
-                 await query.answer("🗑️ Ultimo evento eliminato!", show_alert=True)
+                 await query.answer("🗑️ Eliminato!", show_alert=False) # Changed
                  await show_status(update, tenant.id, event_service) # Refresh list
             else:
-                 await query.answer("Nessun evento da eliminare.", show_alert=True)
+                 await query.answer("Nulla da eliminare.", show_alert=False) # Changed
 
         elif data == 'view_history':
              # Need to import locally to avoid circular import if history imports tracking
@@ -152,7 +152,7 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         else:
             # Fallback for old buttons or unrecognized data
-            await query.answer("🔄 Menu aggiornato, riprova.", show_alert=True)
+            await query.answer("🔄 Menu aggiornato.", show_alert=False) # Changed
             await menu_handler(update, context)
 
 async def show_feeding_menu(update: Update):
