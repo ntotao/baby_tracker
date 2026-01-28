@@ -151,23 +151,46 @@ async def show_timer_active(update: Update, side: str):
 async def show_status(update: Update, tenant_id: str, service: EventService):
     events = await service.get_recent_events(tenant_id, 10)
     summary = await service.get_daily_summary(tenant_id)
+    last_feed = await service.get_last_feeding(tenant_id)
     
-    # Format Summary
-    summary_text = "📊 *Riepilogo Oggi:*\n"
+    # --- SMART HEADER ---
+    header_text = "📊 *Riepilogo Oggi:*\n"
+    
+    # Feeding Status
+    if last_feed:
+        now = datetime.datetime.now()
+        diff = now - last_feed.timestamp.replace(tzinfo=None) # naive check
+        hours = diff.seconds // 3600
+        minutes = (diff.seconds % 3600) // 60
+        
+        last_side = last_feed.details.get('source', 'unknown') if last_feed.details else 'unknown'
+        
+        next_hint = ""
+        if last_side == 'left': next_hint = "👉 Next: Right"
+        elif last_side == 'right': next_hint = "👈 Next: Left"
+        
+        time_str = f"{hours}h {minutes}m fa"
+        if diff.days > 0: time_str = "> 24h fa"
+        
+        header_text += f"🍼 *Ultima Poppata:* {time_str} ({last_side})\n_{next_hint}_\n\n"
+    else:
+        header_text += "🍼 Nessuna poppata registrata.\n\n"
+
+    # Daily Counts
     if not summary:
-        summary_text += "Nessun evento oggi.\n"
+        header_text += "Nessun evento oggi.\n"
     else:
         for etype, count in summary:
             icon = "⚪️"
             if etype == 'cacca': icon = "💩"
             elif etype == 'pipi': icon = "💧"
             elif etype == 'allattamento': icon = "🍼"
-            summary_text += f"{icon} {etype.capitalize()}: {count}\n"
+            header_text += f"{icon} {etype.capitalize()}: {count}\n"
             
-    # Format List
-    events_text = "\n🕒 *Ultimi Eventi:*\n"
+    # List
+    events_text = "\n🕒 *Storico Recente:*\n"
     for e in events:
-        ts = e.timestamp.strftime("%H:%M") # Naive server time
+        ts = e.timestamp.strftime("%H:%M")
         
         detail_str = ""
         if e.details and e.event_type == 'allattamento':
@@ -176,7 +199,7 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
             
             if src == 'left': detail_str = f" (👈 {dur})"
             elif src == 'right': detail_str = f" (👉 {dur})"
-            elif src == 'bottle': detail_str = " (🍼 Bottle)"
+            elif src == 'bottle': detail_str = " (🍼)"
             else: detail_str = f" ({src})"
             
         icon = "⚪️"
@@ -186,7 +209,7 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         
         events_text += f"`{ts}` {icon} {e.event_type}{detail_str}\n"
 
-    msg = f"{summary_text}{events_text}"
+    msg = f"{header_text}{events_text}"
     kb = [
         [InlineKeyboardButton("🗑️ Elimina Ultimo", callback_data='delete_last_event')],
         [InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]

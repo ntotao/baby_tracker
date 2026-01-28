@@ -38,3 +38,20 @@ class Event(Base):
     
     # Relationships
     tenant = relationship("Tenant", back_populates="events")
+
+class Baby(Base):
+    __tablename__ = "babies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, unique=True) # One baby per tenant for now
+    
+    name = Column(String, nullable=False)
+    birth_date = Column(DateTime, nullable=True)
+    weight_g = Column(Integer, nullable=True) # Grams
+    height_cm = Column(Integer, nullable=True) # Centimeters
+    
+    # Relationships
+    tenant = relationship("Tenant", back_populates="baby")
+
+# Update Tenant to include baby relationship
+Tenant.baby = relationship("Baby", back_populates="tenant", uselist=False, cascade="all, delete-orphan")
