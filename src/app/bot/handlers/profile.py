@@ -45,7 +45,12 @@ async def child_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SET_NAME
 
 async def set_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text
+    name = update.message.text.strip()
+    
+    if len(name) < 2 or len(name) > 30:
+        await update.message.reply_text("⚠️ Il nome deve essere tra 2 e 30 caratteri. Riprova:")
+        return SET_NAME
+        
     context.user_data['baby_name'] = name
     
     await update.message.reply_text(
