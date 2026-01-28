@@ -14,6 +14,7 @@ log - Inserimento Manuale (Eventi passati)
 import - Import Data da CSV
 child - Profilo del Bambino
 growth - Grafici di Crescita
+invite - Genera link invito
 admin - Gestione Condivisione
 help - Guida e Supporto
 ```
@@ -25,14 +26,19 @@ Send `/setdescription` to BotFather. This text appears *before* the user clicks 
 👶 Baby Tracker Condiviso
 
 L'assistente perfetto per neo-genitori! 
-Tieni traccia di poppate, cambi pannolino e crescita in modo semplice e condiviso con il partner.
+Tieni traccia di poppate, sonno, salute e crescita in modo semplice e condiviso.
 
 Funzionalità:
-✅ Timer Allattamento (Destra/Sinistra)
-✅ Log Biberon e Pappa
+✅ Allattamento (Timer, Manuale, Biberon)
+✅ Nanna (Timer Sonno/Sveglia)
+✅ Salute (Febbre, Medicine, Vaccini)
 ✅ Registro Cacca e Pipì
-✅ Grafici riepilogativi
-✅ Condivisione in tempo reale con familiari
+✅ Grafici Crescita & Storico
+✅ Integrazione Home Assistant 🏠
+✅ Condivisione in tempo reale
+
+Premi /start per iniziare!
+```
 
 Premi /start per iniziare!
 ```
