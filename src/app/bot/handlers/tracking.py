@@ -54,7 +54,6 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == 'track_cacca':
             await event_service.add_event(tenant.id, user_id, 'cacca')
             await query.answer("💩 Cacca registrata!", show_alert=False) 
-            # Do NOT edit message, keep menu open
             
         elif data == 'track_pipi':
             await event_service.add_event(tenant.id, user_id, 'pipi')
@@ -70,17 +69,42 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer()
             await show_feeding_menu(update)
             
-        elif data.startswith('feed_'):
-            # Handle specific feeding types
-            feed_type = data.replace('feed_', '') # left, right, bottle
+        elif data.startswith('feed_timer_start_'):
+             side = data.replace('feed_timer_start_', '')
+             context.user_data['feeding_start'] = {
+                 'side': side,
+                 'start_time': datetime.datetime.now().timestamp()
+             }
+             await show_timer_active(update, side)
+             await query.answer("⏱️ Timer avviato!")
+
+        elif data == 'feed_timer_stop':
+             if 'feeding_start' not in context.user_data:
+                 await query.answer("Nessun timer attivo.", show_alert=True)
+                 await menu_handler(update, context)
+                 return
+                 
+             start_data = context.user_data.pop('feeding_start')
+             duration = int(datetime.datetime.now().timestamp() - start_data['start_time'])
+             duration_min = duration // 60
+             
+             details = {
+                 'source': start_data['side'],
+                 'duration_seconds': duration,
+                 'duration_text': f"{duration_min} min"
+             }
+             
+             await event_service.add_event(tenant.id, user_id, 'allattamento', details)
+             await query.answer(f"✅ Poppata terminata: {duration_min} min", show_alert=True)
+             await menu_handler(update, context)
+
+        elif data.startswith('feed_log_'):
+            # Instant log (bottle/manual side without timer)
+            feed_type = data.replace('feed_log_', '')
             details = {'source': feed_type}
-            
-            # TODO: Future upgrade for duration/timer
             await event_service.add_event(tenant.id, user_id, 'allattamento', details)
-            
-            # Confirm and return to main menu
             await query.answer(f"🍼 Allattamento ({feed_type}) registrato!", show_alert=False)
-            await menu_handler(update, context) # Go back to main
+            await menu_handler(update, context)
             
         elif data == 'view_status':
             await query.answer()
@@ -88,14 +112,22 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_feeding_menu(update: Update):
     keyboard = [
-        [InlineKeyboardButton("Left 👈", callback_data='feed_left'),
-         InlineKeyboardButton("Right 👉", callback_data='feed_right')],
-        [InlineKeyboardButton("🍼 Biberon", callback_data='feed_bottle'),
-         InlineKeyboardButton("🔄 Entrambi", callback_data='feed_both')],
+        [InlineKeyboardButton("⏱️ Start Left 👈", callback_data='feed_timer_start_left'),
+         InlineKeyboardButton("⏱️ Start Right 👉", callback_data='feed_timer_start_right')],
+        [InlineKeyboardButton("📝 Log Biberon", callback_data='feed_log_bottle')],
         [InlineKeyboardButton("🔙 Indietro", callback_data='menu_main')]
     ]
     await update.callback_query.edit_message_text(
-        "🍼 *Allattamento*\nScegli il dettaglio:",
+        "🍼 *Allattamento*\nScegli mode:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
+async def show_timer_active(update: Update, side: str):
+    side_icon = "👈" if side == 'left' else "👉"
+    keyboard = [[InlineKeyboardButton("🛑 STOP Timer", callback_data='feed_timer_stop')]]
+    await update.callback_query.edit_message_text(
+        f"⏱️ *Allattamento in corso...* {side_icon}\nPremi Stop quando hai finito.",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='Markdown'
     )
@@ -124,9 +156,12 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         detail_str = ""
         if e.details and e.event_type == 'allattamento':
             src = e.details.get('source', '')
-            if src == 'left': detail_str = " (👈)"
-            elif src == 'right': detail_str = " (👉)"
-            elif src == 'bottle': detail_str = " (🍼)"
+            dur = e.details.get('duration_text', '')
+            
+            if src == 'left': detail_str = f" (👈 {dur})"
+            elif src == 'right': detail_str = f" (👉 {dur})"
+            elif src == 'bottle': detail_str = " (🍼 Bottle)"
+            else: detail_str = f" ({src})"
             
         icon = "⚪️"
         if e.event_type == 'cacca': icon = "💩"
