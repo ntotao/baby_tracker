@@ -40,3 +40,13 @@ class EventService:
             
         result = await self.db.execute(stmt)
         return result.all()
+    async def delete_last_event(self, tenant_id: str) -> bool:
+        stmt = select(Event).where(Event.tenant_id == tenant_id).order_by(desc(Event.timestamp)).limit(1)
+        result = await self.db.execute(stmt)
+        event = result.scalar_one_or_none()
+        
+        if event:
+            await self.db.delete(event)
+            await self.db.commit()
+            return True
+        return False

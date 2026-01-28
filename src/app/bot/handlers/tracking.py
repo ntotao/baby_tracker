@@ -113,6 +113,14 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer()
             await show_status(update, tenant.id, event_service)
 
+        elif data == 'delete_last_event':
+            success = await event_service.delete_last_event(tenant.id)
+            if success:
+                 await query.answer("🗑️ Ultimo evento eliminato!", show_alert=True)
+                 await show_status(update, tenant.id, event_service) # Refresh list
+            else:
+                 await query.answer("Nessun evento da eliminare.", show_alert=True)
+
         else:
             # Fallback for old buttons or unrecognized data
             await query.answer("🔄 Menu aggiornato, riprova.", show_alert=True)
@@ -179,7 +187,10 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         events_text += f"`{ts}` {icon} {e.event_type}{detail_str}\n"
 
     msg = f"{summary_text}{events_text}"
-    kb = [[InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]]
+    kb = [
+        [InlineKeyboardButton("🗑️ Elimina Ultimo", callback_data='delete_last_event')],
+        [InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]
+    ]
     
     await update.callback_query.edit_message_text(msg, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
 
@@ -189,5 +200,5 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Handler Exports
 menu_cmd_handler = CommandHandler("menu", menu_handler)
 # Catch-all for track_, feed_, view_status
-track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_status|menu_)") 
+track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_status|menu_|delete_)") 
 back_handler = CallbackQueryHandler(back_to_menu, pattern="^menu_main$")
