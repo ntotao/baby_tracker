@@ -140,6 +140,91 @@ async def select_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return SELECT_TIME
 
+def generate_time_picker(dt: datetime.datetime, source: str):
+    time_str = dt.strftime("%H:%M")
+    date_str = "Oggi" if dt.date() == datetime.datetime.now().date() else dt.strftime("%d/%m")
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ 1h", callback_data='clk_h_inc'),
+         InlineKeyboardButton("➕ 10m", callback_data='clk_m_inc')],
+        
+        [InlineKeyboardButton(f"🕒 {time_str}", callback_data='ignore'), # Display Key
+         InlineKeyboardButton(f"📅 {date_str}", callback_data='clk_day_toggle')], 
+        
+        [InlineKeyboardButton("➖ 1h", callback_data='clk_h_dec'),
+         InlineKeyboardButton("➖ 10m", callback_data='clk_m_dec')],
+         
+        [InlineKeyboardButton("✅ Conferma", callback_data='clk_confirm')],
+        [InlineKeyboardButton("❌ Annulla", callback_data='manual_cancel')]
+    ]
+    
+    text = f"🤱 *Allattamento {source.capitalize()}*\nSeleziona Orario Inizio:"
+    return text, InlineKeyboardMarkup(keyboard)
+
+async def handle_time_interaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+    
+    if data == 'manual_cancel':
+        await query.answer("Annullato.")
+        from src.app.bot.handlers.tracking import menu_handler
+        await menu_handler(update, context)
+        return ConversationHandler.END
+
+    # Ensure temp_time exists
+    if 'temp_time' not in context.user_data:
+        # Fallback if lost
+        context.user_data['temp_time'] = datetime.datetime.now()
+    
+    current_time = context.user_data['temp_time']
+    
+    if data == 'clk_confirm':
+        # Proceed to Duration
+        context.user_data['manual_event_time'] = current_time # Save confirmed START time
+        
+        # Ask Duration
+        keyboard = [
+             [InlineKeyboardButton("5 min", callback_data='manual_dur_5'),
+              InlineKeyboardButton("10 min", callback_data='manual_dur_10')],
+             [InlineKeyboardButton("15 min", callback_data='manual_dur_15'),
+              InlineKeyboardButton("20 min", callback_data='manual_dur_20')],
+             [InlineKeyboardButton("30 min", callback_data='manual_dur_30'),
+              InlineKeyboardButton("45 min", callback_data='manual_dur_45')],
+             [InlineKeyboardButton("❌ Annulla", callback_data='manual_cancel')]
+        ]
+        await query.edit_message_text(
+             f"✅ Inizio: *{current_time.strftime('%H:%M')}*\nQuanto è durato?",
+             reply_markup=InlineKeyboardMarkup(keyboard),
+             parse_mode='Markdown'
+        )
+        return SELECT_DURATION
+
+    # Adjust Time
+    if data == 'clk_h_inc': current_time += datetime.timedelta(hours=1)
+    elif data == 'clk_h_dec': current_time -= datetime.timedelta(hours=1)
+    elif data == 'clk_m_inc': current_time += datetime.timedelta(minutes=10)
+    elif data == 'clk_m_dec': current_time -= datetime.timedelta(minutes=10)
+    elif data == 'clk_day_toggle': 
+        # Toggle Yesterday/Today
+        if current_time.date() == datetime.datetime.now().date():
+            current_time -= datetime.timedelta(days=1)
+        else:
+            current_time = current_time.replace(year=datetime.datetime.now().year, month=datetime.datetime.now().month, day=datetime.datetime.now().day)
+    
+    context.user_data['temp_time'] = current_time
+    
+    # Regenerate markup
+    source = context.user_data['manual_event']['details']['source']
+    msg_text, markup = generate_time_picker(current_time, source)
+    
+    try:
+        await query.edit_message_text(msg_text, reply_markup=markup, parse_mode='Markdown')
+    except Exception as e:
+        logger.warning(f"Clock update skipped (content same?): {e}")
+        
+    await query.answer()
+    return SELECT_START_TIME_INTERACTIVE
+
 async def select_duration(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
