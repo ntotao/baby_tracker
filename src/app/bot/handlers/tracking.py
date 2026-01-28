@@ -15,8 +15,7 @@ async def get_main_menu_keyboard():
         [InlineKeyboardButton("💩+💧 Entrambi", callback_data='track_entrambi')],
         [InlineKeyboardButton("🍼 Allattamento", callback_data='menu_feeding'),
          InlineKeyboardButton("💤 Nanna", callback_data='menu_sleep')],
-        [InlineKeyboardButton("🩺 Salute", callback_data='menu_health'),
-         InlineKeyboardButton("📝 Manuale", callback_data='start_manual_log')],
+        [InlineKeyboardButton("🩺 Salute", callback_data='menu_health')],
         [InlineKeyboardButton("📊 Stato Oggi", callback_data='view_status')]
     ])
 
@@ -214,7 +213,8 @@ async def show_feeding_menu(update: Update):
     keyboard = [
         [InlineKeyboardButton("⏱️ Start Left 👈", callback_data='feed_timer_start_left'),
          InlineKeyboardButton("⏱️ Start Right 👉", callback_data='feed_timer_start_right')],
-        [InlineKeyboardButton("📝 Log Biberon", callback_data='feed_log_bottle')],
+        [InlineKeyboardButton("📝 Manuale", callback_data='start_manual_log'),
+         InlineKeyboardButton("🍼 Biberon", callback_data='feed_log_bottle')],
         [InlineKeyboardButton("🔙 Indietro", callback_data='menu_main')]
     ]
     await update.callback_query.edit_message_text(
@@ -379,9 +379,25 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         event_service = EventService(db)
         await show_status(update, tenant.id, event_service)
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "🆘 *Baby Tracker Help*\n\n"
+        "Ecco cosa posso fare:\n"
+        "/menu - Pannello principale\n"
+        "/status - Riepilogo di oggi\n"
+        "/log - Registra evento passato\n"
+        "/history - Vedi/Cancella eventi\n"
+        "/growth - Grafici crescita\n"
+        "/import - Carica CSV\n"
+        "/invite - Invita genitore\n\n"
+        "Problemi? Contatta il creatore!"
+    )
+    await update.message.reply_text(text, parse_mode='Markdown')
+
 # Handler Exports
 menu_cmd_handler = CommandHandler("menu", menu_handler)
 status_cmd_handler = CommandHandler("status", status_command)
+help_cmd_handler = CommandHandler("help", help_command)
 # Catch-all for track_, feed_, view_status
 track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_|menu_|delete_|sleep_|health_)") 
 back_handler = CallbackQueryHandler(back_to_menu, pattern="^menu_main$")
