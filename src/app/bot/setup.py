@@ -1,4 +1,4 @@
-from telegram.ext import Application, ApplicationBuilder
+from telegram.ext import Application, ApplicationBuilder, CommandHandler
 from src.app.core.config import settings
 
 async def create_bot() -> Application:
