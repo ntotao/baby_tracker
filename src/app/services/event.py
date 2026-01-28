@@ -50,10 +50,10 @@ class EventService:
             await self.db.commit()
             return True
         return False
-    async def get_last_feeding(self, tenant_id: str) -> Event | None:
+    async def get_last_event_by_type(self, tenant_id: str, event_type: str) -> Event | None:
         stmt = select(Event).where(
             Event.tenant_id == tenant_id,
-            Event.event_type == 'allattamento'
+            Event.event_type == event_type
         ).order_by(desc(Event.timestamp)).limit(1)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
