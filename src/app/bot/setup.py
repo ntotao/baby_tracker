@@ -13,9 +13,11 @@ async def create_bot() -> Application:
     # Register handlers
     from src.app.bot.handlers.onboarding import start_handler, register_handler, invite_command
     from src.app.bot.handlers.tracking import menu_cmd_handler, track_handler, back_handler
+    from src.app.bot.handlers.profile import profile_conv_handler
     
     app.add_handler(start_handler)
     app.add_handler(register_handler)
+    app.add_handler(profile_conv_handler) # Add conversation before commands that might conflict
     app.add_handler(CommandHandler("invite", invite_command))
     app.add_handler(menu_cmd_handler)
     app.add_handler(track_handler)
