@@ -18,12 +18,14 @@ async def create_bot() -> Application:
     from src.app.bot.handlers.admin import admin_handler, admin_callback_handler
     from src.app.bot.handlers.history import history_cmd_handler, history_callback_handler
     from src.app.bot.handlers.import_export import import_handler
+    from src.app.bot.handlers.charts import chart_handler
     
     app.add_handler(start_handler)
     app.add_handler(register_handler)
     app.add_handler(profile_conv_handler)
     app.add_handler(manual_log_handler)
     app.add_handler(import_handler)
+    app.add_handler(chart_handler)
     app.add_handler(admin_handler)
     app.add_handler(admin_callback_handler)
     app.add_handler(history_cmd_handler)
