@@ -110,6 +110,11 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer()
             await show_status(update, tenant.id, event_service)
 
+        else:
+            # Fallback for old buttons or unrecognized data
+            await query.answer("🔄 Menu aggiornato, riprova.", show_alert=True)
+            await menu_handler(update, context)
+
 async def show_feeding_menu(update: Update):
     keyboard = [
         [InlineKeyboardButton("⏱️ Start Left 👈", callback_data='feed_timer_start_left'),
