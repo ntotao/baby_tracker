@@ -261,13 +261,28 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         [InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]
     ]
     
-    await update.callback_query.edit_message_text(msg, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
+    if update.callback_query:
+        await update.callback_query.edit_message_text(msg, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
+    else:
+        await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
 
 async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await menu_handler(update, context)
 
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    async with AsyncSessionLocal() as db:
+        tenant_service = TenantService(db)
+        tenant = await tenant_service.get_tenant_by_user(user_id)
+        if not tenant:
+            await update.message.reply_text("Non hai un tracker attivo.")
+            return
+        event_service = EventService(db)
+        await show_status(update, tenant.id, event_service)
+
 # Handler Exports
 menu_cmd_handler = CommandHandler("menu", menu_handler)
+status_cmd_handler = CommandHandler("status", status_command)
 # Catch-all for track_, feed_, view_status
 track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_|menu_|delete_)") 
 back_handler = CallbackQueryHandler(back_to_menu, pattern="^menu_main$")
