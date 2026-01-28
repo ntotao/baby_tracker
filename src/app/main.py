@@ -32,8 +32,12 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
 
         # Initialize Bot
-        bot_app = await create_bot()
-        await bot_app.initialize()
+        try:
+            bot_app = await create_bot()
+            await bot_app.initialize()
+        except Exception as e:
+            logger.critical(f"Failed to initialize bot: {e}. Check your TELEGRAM_TOKEN.")
+            raise e
         
         # Start Polling (for Development) or Webhook (for Prod)
         # For now, we assume simple polling loop handled manually or background task
