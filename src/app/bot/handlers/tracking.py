@@ -41,6 +41,9 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
     
+    logger.info(f"DEBUG: track_callback handling data={data} from user={user_id}")
+    
+    
     async with AsyncSessionLocal() as db:
         tenant_service = TenantService(db)
         tenant = await tenant_service.get_tenant_by_user(user_id)
