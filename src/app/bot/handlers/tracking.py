@@ -252,12 +252,25 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         if diff.days > 0: return ">24h"
         return f"{hours}h {minutes}m"
 
+    def escape_md(text):
+        if not text: return ""
+        # Simple escape for Markdown V1 (only what we use)
+        return str(text).replace("_", "\\_").replace("*", "\\*").replace("`", "\\`").replace("[", "\\[")
+
     # Feeding
     if last_feed:
         time_str = format_diff(last_feed.timestamp)
-        last_side = last_feed.details.get('source', 'unknown') if last_feed.details else 'unknown'
-        next_hint = "👉 Next: Right" if last_side == 'left' else "👈 Next: Left" if last_side == 'right' else ""
-        header_text += f"🍼 *Poppata:* {time_str} fa ({last_side})\n   _{next_hint}_\n"
+        # last_side comes from dict, safe check
+        raw_side = last_feed.details.get('source', 'unknown') if last_feed.details else 'unknown'
+        last_side = escape_md(raw_side)
+        
+        next_hint = ""
+        if raw_side == 'left': next_hint = "👉 Next: Right"
+        elif raw_side == 'right': next_hint = "👈 Next: Left"
+        
+        header_text += f"🍼 *Poppata:* {time_str} fa ({last_side})\n"
+        if next_hint:
+             header_text += f"   _{escape_md(next_hint)}_\n"
     else:
         header_text += "🍼 *Poppata:* --\n"
 
@@ -292,22 +305,43 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         ts = e.timestamp.strftime("%H:%M")
         
         detail_str = ""
-        if e.details and e.event_type == 'allattamento':
-            src = e.details.get('source', '')
-            dur = e.details.get('duration_text', '')
-            if src == 'left': detail_str = f" (👈 {dur})"
-            elif src == 'right': detail_str = f" (👉 {dur})"
-            elif src == 'bottle':
-                 ml = e.details.get('quantity_ml', '?')
-                 detail_str = f" (🍼 {ml}ml)"
-            else: detail_str = f" ({src})"
-            
+        if e.details:
+             # Formatting details based on type
+             if e.event_type == 'allattamento':
+                src = e.details.get('source', '')
+                dur = e.details.get('duration_text', '')
+                if src == 'left': detail_str = f" (👈 {dur})"
+                elif src == 'right': detail_str = f" (👉 {dur})"
+                elif src == 'bottle':
+                     ml = e.details.get('quantity_ml', '?')
+                     detail_str = f" (🍼 {ml}ml)"
+                else: detail_str = f" ({src})"
+             elif e.event_type == 'salute':
+                 subtype = e.details.get('subtype', '')
+                 val = e.details.get('value', '')
+                 note = e.details.get('note', '')
+                 detail_str = f" ({subtype} {val} {note})".strip()
+             elif e.event_type == 'sonno':
+                 dur = e.details.get('duration_text', '')
+                 detail_str = f" (😴 {dur})"
+             elif 'misurazione' in e.event_type:
+                  # peso or altezza
+                  val = e.details.get('value', '')
+                  unit = "g" if "peso" in e.event_type else "cm"
+                  detail_str = f" ({val}{unit})"
+
         icon = "⚪️"
         if e.event_type == 'cacca': icon = "💩"
         elif e.event_type == 'pipi': icon = "💧"
         elif e.event_type == 'allattamento': icon = "🍼"
+        elif e.event_type == 'sonno': icon = "💤"
+        elif e.event_type == 'salute': icon = "🩺"
+        elif 'misurazione' in e.event_type: icon = "📏"
         
-        events_text += f"`{ts}` {icon} {e.event_type}{detail_str}\n"
+        safe_type = escape_md(e.event_type)
+        safe_details = escape_md(detail_str)
+        
+        events_text += f"`{ts}` {icon} {safe_type}{safe_details}\n"
 
     msg = f"{header_text}{events_text}"
     kb = [
