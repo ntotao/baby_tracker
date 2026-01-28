@@ -58,3 +58,42 @@ class EventService:
         ).order_by(desc(Event.timestamp)).limit(1)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+    async def get_recent_events_by_type(self, tenant_id: str, event_type: str, limit: int = 20):
+        stmt = select(Event).where(
+            Event.tenant_id == tenant_id,
+            Event.event_type == event_type
+        ).order_by(desc(Event.timestamp)).limit(limit)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_last_n_days_summary(self, tenant_id: str, days: int = 7):
+        start_date = datetime.now() - timedelta(days=days)
+        # SQLite specific: strftime('%Y-%m-%d', timestamp)
+        # SQLAlchemy generic: func.date(Event.timestamp) (works on SQLite too usually)
+        
+        stmt = select(
+            func.date(Event.timestamp).label("date"), 
+            Event.event_type, 
+            func.count(Event.id)
+        ).where(
+            Event.tenant_id == tenant_id, 
+            Event.timestamp >= start_date
+        ).group_by(
+            "date", 
+            Event.event_type
+        ).order_by("date")
+        
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        
+        # Aggregate: {"2024-01-01": {"cacca": 1, ...}}
+        data = {}
+        for r in rows:
+            d_str = r.date # '2024-01-01'
+            etype = r.event_type
+            count = r.count  # SQLAlchemy < 1.4: r[2], >= 1.4 + future: r.count
+            
+            if d_str not in data: data[d_str] = {'date': d_str, 'counts': {}}
+            data[d_str]['counts'][etype] = count
+            
+        return list(data.values())
