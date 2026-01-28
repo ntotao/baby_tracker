@@ -13,6 +13,7 @@ history - Storico e Cancellazione
 log - Inserimento Manuale (Eventi passati)
 import - Import Data da CSV
 child - Profilo del Bambino
+growth - Grafici di Crescita
 admin - Gestione Condivisione
 help - Guida e Supporto
 ```
