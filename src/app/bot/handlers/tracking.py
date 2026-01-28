@@ -145,6 +145,11 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                  await query.answer("Nessun evento da eliminare.", show_alert=True)
 
+        elif data == 'view_history':
+             # Need to import locally to avoid circular import if history imports tracking
+             from src.app.bot.handlers.history import history_list
+             await history_list(update, context, 0)
+
         else:
             # Fallback for old buttons or unrecognized data
             await query.answer("🔄 Menu aggiornato, riprova.", show_alert=True)
@@ -252,7 +257,7 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
     msg = f"{header_text}{events_text}"
     kb = [
         [InlineKeyboardButton("🔄 Aggiorna", callback_data='view_status')],
-        [InlineKeyboardButton("🗑️ Elimina Ultimo", callback_data='delete_last_event')],
+        [InlineKeyboardButton("📜 Storico Completo", callback_data='view_history')],
         [InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]
     ]
     

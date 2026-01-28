@@ -16,6 +16,7 @@ async def create_bot() -> Application:
     from src.app.bot.handlers.profile import profile_conv_handler
     from src.app.bot.handlers.manual_log import manual_log_handler
     from src.app.bot.handlers.admin import admin_handler, admin_callback_handler
+    from src.app.bot.handlers.history import history_cmd_handler, history_callback_handler
     
     app.add_handler(start_handler)
     app.add_handler(register_handler)
@@ -23,6 +24,11 @@ async def create_bot() -> Application:
     app.add_handler(manual_log_handler)
     app.add_handler(admin_handler)
     app.add_handler(admin_callback_handler)
+    app.add_handler(history_cmd_handler)
+    app.add_handler(history_callback_handler) # BEFORE track_handler if possible, or track_handler pattern specific?
+    # track_handler has pattern "^(track_|feed_|view_status|menu_|delete_)"
+    # history has "^hist_"
+    # So no partial overlapping. Safe.
     app.add_handler(CommandHandler("invite", invite_command))
     app.add_handler(menu_cmd_handler)
     app.add_handler(track_handler)
