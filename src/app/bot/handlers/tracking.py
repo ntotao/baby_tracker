@@ -269,5 +269,5 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Handler Exports
 menu_cmd_handler = CommandHandler("menu", menu_handler)
 # Catch-all for track_, feed_, view_status
-track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_status|menu_|delete_)") 
+track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_|menu_|delete_)") 
 back_handler = CallbackQueryHandler(back_to_menu, pattern="^menu_main$")

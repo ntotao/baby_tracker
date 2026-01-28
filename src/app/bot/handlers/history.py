@@ -81,6 +81,7 @@ async def history_list(update: Update, context: ContextTypes.DEFAULT_TYPE, page:
     markup = InlineKeyboardMarkup(kb)
     
     if update.callback_query:
+        await update.callback_query.answer() # Ack immediately
         await update.callback_query.edit_message_text(msg, reply_markup=markup, parse_mode='Markdown')
     else:
         await update.message.reply_text(msg, reply_markup=markup, parse_mode='Markdown')
