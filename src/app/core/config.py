@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_TOKEN: str
     TELEGRAM_ADMIN_ID: Optional[int] = None
+    WEBAPP_URL: str = "https://your-domain.com" # Required for Web App Button
     
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/babytracker.db"

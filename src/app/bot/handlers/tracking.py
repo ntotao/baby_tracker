@@ -1,5 +1,6 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from src.app.core.config import settings
 from src.app.db.session import AsyncSessionLocal
 from src.app.services.event import EventService
 from src.app.services.tenant import TenantService
@@ -16,7 +17,8 @@ async def get_main_menu_keyboard():
         [InlineKeyboardButton("🍼 Allattamento", callback_data='menu_feeding'),
          InlineKeyboardButton("💤 Nanna", callback_data='menu_sleep')],
         [InlineKeyboardButton("🩺 Salute", callback_data='menu_health')],
-        [InlineKeyboardButton("📊 Stato Oggi", callback_data='view_status')]
+        [InlineKeyboardButton("📊 Stato Oggi", callback_data='view_status'),
+         InlineKeyboardButton("📈 Grafici", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}/static/index.html"))]
     ])
 
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Baby Tracker Charts</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #fff);
+            color: var(--tg-theme-text-color, #000);
+            padding: 10px;
+            margin: 0;
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #fff);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h2>📈 Crescita</h2>
+    <div class="chart-container">
+        <canvas id="weightChart"></canvas>
+    </div>
+    
+    <h2>🍼 Poppate (Ultimi 7 gg)</h2>
+    <div class="chart-container">
+        <canvas id="feedChart"></canvas>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        // Fetch data from our API
+        // In real app, we should validate initData on backend
+        // For simplicity, we pass initDataStr to backend or just rely on UUID if we had session logic
+        // But here we'll use a simple approach: The User uses the WebApp, we fetch data based on the user ID passed in initData (safe on server side check)
+        
+        async function fetchData() {
+            const initData = tg.initData;
+            
+            try {
+                // We'll call a dedicated API endpoint
+                const response = await fetch(`/api/webapp/data?${initData}`);
+                const data = await response.json();
+                
+                renderWeightChart(data.weight_history);
+                renderFeedChart(data.feed_history);
+                
+            } catch (e) {
+                console.error(e);
+                alert("Errore nel caricamento dati.");
+            }
+        }
+        
+        function renderWeightChart(data) {
+            const ctx = document.getElementById('weightChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: 'Peso (g)',
+                        data: data.values,
+                        borderColor: '#2481cc',
+                        tension: 0.1
+                    }]
+                }
+            });
+        }
+        
+        function renderFeedChart(data) {
+             const ctx = document.getElementById('feedChart').getContext('2d');
+             new Chart(ctx, {
+                 type: 'bar',
+                 data: {
+                     labels: data.dates,
+                     datasets: [{
+                         label: 'Poppate',
+                         data: data.counts,
+                         backgroundColor: '#f6c445'
+                     }]
+                 }
+             });
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>

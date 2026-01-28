@@ -67,7 +67,9 @@ async def lifespan(app: FastAPI):
             await bot_app.stop()
             await bot_app.shutdown()
 
+from fastapi.staticfiles import StaticFiles
 from src.app.api.ha import router as ha_router
+from src.app.api.webapp import router as webapp_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -75,7 +77,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
+
 app.include_router(ha_router, prefix="/api/ha", tags=["Home Assistant"])
+app.include_router(webapp_router, prefix="/api/webapp", tags=["Web App"])
 
 @app.get("/health")
 async def health_check():
