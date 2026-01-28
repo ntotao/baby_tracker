@@ -60,6 +60,26 @@ Il modo più veloce per partire.
 
 ---
 
+## 🏠 Home Assistant Integration
+
+Il bot espone un componente custom per HA.
+👉 **[Leggi la guida completa all'integrazione (Deep Dive)](HA_INTEGRATION.md)**
+
+1.  Copia la cartella `custom_components/baby_tracker` dentro la cartella `custom_components` del tuo Home Assistant.
+2.  Aggiungi questo al tuo `configuration.yaml` di HA:
+
+```yaml
+sensor:
+  - platform: baby_tracker
+    host: http://IP_DEL_BOT:8000
+    telegram_id: 123456789  # Il tuo ID Telegram (quello che vedi nel log o stampi con bot)
+```
+
+3.  Riavvia HA.
+4.  Troverai sensori come `sensor.baby_tracker_last_feed_time`, `sensor.baby_tracker_count_feed`, etc.
+
+---
+
 ## 📂 Struttura Progetto
 
 *   `src/app/bot`: Logica del Bot Telegram (Handlers, Menu).

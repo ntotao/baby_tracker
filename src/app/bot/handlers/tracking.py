@@ -13,8 +13,10 @@ async def get_main_menu_keyboard():
         [InlineKeyboardButton("💩 Cacca", callback_data='track_cacca'),
          InlineKeyboardButton("💧 Pipì", callback_data='track_pipi')],
         [InlineKeyboardButton("💩+💧 Entrambi", callback_data='track_entrambi')],
-        [InlineKeyboardButton("🍼 Allattamento", callback_data='menu_feeding')],
-        [InlineKeyboardButton("📝 Inserimento Manuale", callback_data='start_manual_log')],
+        [InlineKeyboardButton("🍼 Allattamento", callback_data='menu_feeding'),
+         InlineKeyboardButton("💤 Nanna", callback_data='menu_sleep')],
+        [InlineKeyboardButton("🩺 Salute", callback_data='menu_health'),
+         InlineKeyboardButton("📝 Manuale", callback_data='start_manual_log')],
         [InlineKeyboardButton("📊 Stato Oggi", callback_data='view_status')]
     ])
 
@@ -69,10 +71,63 @@ async def track_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("💩+💧 Entrambi registrati!", show_alert=False)
 
         # --- SUB MENUS ---
+        # --- SUB MENUS ---
         elif data == 'menu_feeding':
             await query.answer()
             await show_feeding_menu(update)
+
+        elif data == 'menu_sleep':
+            await query.answer()
+            await show_sleep_menu(update, context)
+
+        elif data == 'menu_health':
+            await query.answer()
+            await show_health_menu(update)
             
+        # --- SLEEP LOGIC ---
+        elif data == 'sleep_start':
+             context.user_data['sleep_start'] = datetime.datetime.now().timestamp()
+             await show_sleep_active(update)
+             await query.answer("💤 Buonanotte!")
+
+        elif data == 'sleep_stop':
+             if 'sleep_start' not in context.user_data:
+                 await query.answer("Nessun sonno attivo.", show_alert=False)
+                 await show_sleep_menu(update, context)
+                 return
+                 
+             start_ts = context.user_data.pop('sleep_start')
+             duration = int(datetime.datetime.now().timestamp() - start_ts)
+             duration_min = duration // 60
+             
+             details = {
+                 'duration_seconds': duration,
+                 'duration_text': f"{duration_min} min"
+             }
+             await event_service.add_event(tenant.id, user_id, 'sonno', details)
+             await query.answer(f"☀️ Buongiorno! Dormito {duration_min}m", show_alert=False)
+             await menu_handler(update, context)
+
+        # --- HEALTH LOGIC ---
+        elif data.startswith('health_temp_'):
+            val = data.replace('health_temp_', '')
+            details = {'subtype': 'febbre', 'value': val}
+            await event_service.add_event(tenant.id, user_id, 'salute', details)
+            await query.answer(f"🌡️ Febbre {val}° registrata", show_alert=False)
+            await menu_handler(update, context)
+
+        elif data.startswith('health_med_'):
+            med = data.replace('health_med_', '')
+            details = {'subtype': 'medicina', 'note': med}
+            await event_service.add_event(tenant.id, user_id, 'salute', details)
+            await query.answer(f"💊 {med} registrata", show_alert=False)
+            await menu_handler(update, context)
+            
+        elif data == 'health_vaccine':
+            await event_service.add_event(tenant.id, user_id, 'salute', {'subtype': 'vaccino'})
+            await query.answer("💉 Vaccino registrato", show_alert=False)
+            await menu_handler(update, context)
+
         elif data.startswith('feed_timer_start_'):
              side = data.replace('feed_timer_start_', '')
              context.user_data['feeding_start'] = {
@@ -266,6 +321,50 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
     else:
         await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
 
+async def show_sleep_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if sleep active
+    if 'sleep_start' in context.user_data:
+        await show_sleep_active(update)
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("💤 Inizia Nanna (Timer)", callback_data='sleep_start')],
+        # Future: Manual Input
+        [InlineKeyboardButton("🔙 Indietro", callback_data='menu_main')]
+    ]
+    await update.callback_query.edit_message_text(
+        "🌙 *Nanna*\nAvvia il timer quando si addormenta:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
+async def show_sleep_active(update: Update):
+    keyboard = [[InlineKeyboardButton("☀️ SVEGLIA (Stop)", callback_data='sleep_stop')]]
+    await update.callback_query.edit_message_text(
+        "💤 *Zzz...*\nBimbo che dorme... Premi Stop al risveglio.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
+async def show_health_menu(update: Update):
+    keyboard = [
+        [InlineKeyboardButton("🌡️ 37.5°", callback_data='health_temp_37.5'),
+         InlineKeyboardButton("🌡️ 38°", callback_data='health_temp_38'),
+         InlineKeyboardButton("🌡️ 38.5°", callback_data='health_temp_38.5')],
+        [InlineKeyboardButton("🌡️ 39°", callback_data='health_temp_39'),
+         InlineKeyboardButton("🌡️ 39.5°", callback_data='health_temp_39.5'),
+         InlineKeyboardButton("🌡️ 40°", callback_data='health_temp_40')],
+        [InlineKeyboardButton("💊 Tachipirina", callback_data='health_med_tachipirina'),
+         InlineKeyboardButton("💊 Vitamina D", callback_data='health_med_vitd')],
+        [InlineKeyboardButton("💉 Vaccino", callback_data='health_vaccine')],
+        [InlineKeyboardButton("🔙 Indietro", callback_data='menu_main')]
+    ]
+    await update.callback_query.edit_message_text(
+        "🩺 *Salute*\nCosa vuoi registrare?",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
 async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await menu_handler(update, context)
 
@@ -284,5 +383,5 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 menu_cmd_handler = CommandHandler("menu", menu_handler)
 status_cmd_handler = CommandHandler("status", status_command)
 # Catch-all for track_, feed_, view_status
-track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_|menu_|delete_)") 
+track_handler = CallbackQueryHandler(track_callback, pattern="^(track_|feed_|view_|menu_|delete_|sleep_|health_)") 
 back_handler = CallbackQueryHandler(back_to_menu, pattern="^menu_main$")
