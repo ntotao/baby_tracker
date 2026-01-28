@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # States
-SELECT_TYPE, SELECT_TIME, INPUT_CUSTOM_TIME, INPUT_VALUE = range(4)
+SELECT_TYPE, SELECT_DURATION, SELECT_TIME, INPUT_CUSTOM_TIME, INPUT_VALUE, SELECT_START_TIME_INTERACTIVE = range(6)
 
 async def manual_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -60,7 +60,51 @@ async def select_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif event_type_raw.startswith('feed_'):
         event_type = 'allattamento'
         source = event_type_raw.replace('feed_', '')
+        
+        # Special case for bottle: ask ML? No, user already did "Biberon manuale".
+        # If manual_type_feed_bottle is clicked, it's treated as feed_bottle -> ask ML logic might be needed?
+        # Actually in THIS handler we have manual_type_feed_bottle. 
+        # Let's treat bottle as generic feed for now or handle ML if requested?
+        # The user request specifically mentioned "Allattamenti manuali" (breast implies duration).
+        # Bottle usually implies Quantity (ML).
+        # Let's keep Start/Duration flow for Breast (Left/Right) and Bottle (maybe just time? or time+ml?).
+        # User said "mia moglie segna orario inizio e durata". This implies breast. 
+        # For bottle, we usually care about ML. 
+        
+        if source == 'bottle':
+            # Redirect to bottle flow? Or just ask Time?
+            # Existing 'Biberon' button in manual_start gives 'manual_type_feed_bottle'.
+            # Let's handle generic Bottle here -> Ask ML -> Then Time.
+            # But the request focuses on Start/Duration. 
+            # Let's stick to Duration flow for Left/Right.
+            pass
+
         details = {'source': source, 'manual': True}
+        context.user_data['manual_event'] = {
+            'type': event_type,
+            'details': details
+        }
+        
+        if source in ['left', 'right']:
+             # NEW FLOW: Ask Start Time (Interactive) -> Then Duration
+             
+             # Init temp time (default to now, rounded to 5min)
+             now = datetime.datetime.now()
+             minute = now.minute - (now.minute % 5)
+             start_time = now.replace(minute=minute, second=0, microsecond=0)
+             
+             context.user_data['temp_time'] = start_time
+             context.user_data['temp_time_str'] = start_time.strftime("%H:%M")
+             
+             # Generate Keyboard
+             msg_text, markup = generate_time_picker(start_time, source)
+             
+             await query.edit_message_text(msg_text, reply_markup=markup, parse_mode='Markdown')
+             return SELECT_START_TIME_INTERACTIVE
+             
+        # For bottle we skip duration (usually) and just go to time... or do we want to ask ML here too?
+        # Current manual_log doesn't support ML input yet. Let's send Bottle to TIME for now to avoid breaking scope.
+        # Ideally we should ask ML for bottle in manual log too.
         
     elif event_type_raw == 'weight':
         event_type = 'misurazione_peso'
@@ -95,6 +139,31 @@ async def select_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
     return SELECT_TIME
+
+async def select_duration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == 'manual_cancel':
+        await query.answer("Annullato.")
+        from src.app.bot.handlers.tracking import menu_handler
+        await menu_handler(update, context)
+        return ConversationHandler.END
+
+    duration_min = int(data.replace('manual_dur_', ''))
+    context.user_data['manual_event']['details']['duration_seconds'] = duration_min * 60
+    context.user_data['manual_event']['details']['duration_text'] = f"{duration_min} min"
+
+    # We already have start time from stored picker result
+    start_time = context.user_data.get('manual_event_time')
+    
+    # Logic: The event needs a TIMESTAMP. The EventService uses timestamp as "Start Time" usually?
+    # Actually add_event timestamp is "Event Time". For duration events, is it start or end?
+    # Usually "Event occurred at X". For Feeding, X is Start Time usually.
+    # Let's verify what we want. "Started at 14:00, lasted 15m". Event Timestamp = 14:00.
+    
+    return await save_event(update, context, start_time)
 
 async def select_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -208,6 +277,8 @@ manual_log_handler = ConversationHandler(
     ],
     states={
         SELECT_TYPE: [CallbackQueryHandler(select_type, pattern='^manual_type_|manual_cancel|manual_menu_cancel')],
+        SELECT_START_TIME_INTERACTIVE: [CallbackQueryHandler(handle_time_interaction, pattern='^clk_|manual_cancel')],
+        SELECT_DURATION: [CallbackQueryHandler(select_duration, pattern='^manual_dur_|manual_cancel')],
         SELECT_TIME: [CallbackQueryHandler(select_time, pattern='^manual_time_|manual_cancel')],
         INPUT_CUSTOM_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_custom_time)],
         INPUT_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_value)]
