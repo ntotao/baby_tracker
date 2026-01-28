@@ -4,7 +4,7 @@
     "codeowners": [
         "@ntotao"
     ],
-    "config_flow": false,
+    "config_flow": true,
     "documentation": "https://github.com/ntotao/baby_tracker",
     "iot_class": "local_polling",
     "issue_tracker": "https://github.com/ntotao/baby_tracker/issues",

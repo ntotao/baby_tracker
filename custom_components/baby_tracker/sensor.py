@@ -1,37 +1,24 @@
 import logging
 import requests
 from datetime import timedelta
-import voluptuous as vol
-
-from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import CONF_HOST, CONF_NAME
-import homeassistant.helpers.config_validation as cv
 from homeassistant.util import Throttle
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_TELEGRAM_ID = "telegram_id"
-DEFAULT_NAME = "Baby Tracker"
-MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=60) # Poll every minute
+MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=60)
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_HOST): cv.string,
-    vol.Required(CONF_TELEGRAM_ID): cv.positive_int,
-    vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-})
-
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the Baby Tracker sensor platform."""
-    host = config.get(CONF_HOST)
-    telegram_id = config.get(CONF_TELEGRAM_ID)
-    name = config.get(CONF_NAME)
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Set up the Baby Tracker sensor from a config entry."""
+    host = config_entry.data.get(CONF_HOST)
+    telegram_id = config_entry.data.get(CONF_TELEGRAM_ID)
+    name = config_entry.data.get(CONF_NAME)
 
     data = BabyTrackerData(host, telegram_id)
-    data.update()
-
-    if data.data is None:
-        _LOGGER.error("Could not connect to Baby Tracker Bot at %s", host)
-        return
+    # Perform initial update
+    await hass.async_add_executor_job(data.update)
 
     sensors = []
     sensors.append(BabyTrackerSensor(data, name, "last_feed_time", "Ultime Poppata", "timestamp"))
@@ -43,21 +30,26 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     sensors.append(BabyTrackerSensor(data, name, "count_cacca", "Cacche Oggi", None))
     sensors.append(BabyTrackerSensor(data, name, "count_pipi", "Pipi Oggi", None))
 
-    add_entities(sensors, True)
+    async_add_entities(sensors, True)
 
 class BabyTrackerSensor(SensorEntity):
     """Representation of a Baby Tracker Sensor."""
 
-    def __init__(self, data, name, sensor_type, label, device_class):
+    def __init__(self, data,name, sensor_type, label, device_class):
         self._data = data
-        self._name = f"{name} {label}"
+        self._name_prefix = name
         self._type = sensor_type
+        self._label = label
         self._state = None
         self._device_class = device_class
 
     @property
     def name(self):
-        return self._name
+        return f"{self._name_prefix} {self._label}"
+
+    @property
+    def unique_id(self):
+        return f"{self._name_prefix}_{self._type}"
 
     @property
     def state(self):
