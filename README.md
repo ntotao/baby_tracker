@@ -1,53 +1,75 @@
-# 👶 Baby Tracker - The "Parenting Survival" Home Assistant Integration
+# 👶 Baby Tracker Bot
 
-**Trasforma il caos in dati!** Perché cercare di ricordare a che ora è stata l'ultima poppata quando puoi chiederlo a un bot?
+Un bot Telegram **self-hosted** per tracciare la vita del neonato, pensato per genitori geek che vogliono privacy, dati e condivisione in tempo reale.
 
-**Baby Tracker** è l'integrazione per **Home Assistant** che ti permette di loggare pannolini, poppate e crescita direttamente da **Telegram**. Perché ammettiamolo, hai il telefono in mano anche alle 3 di notte mentre culli il pupo.
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+![Database](https://img.shields.io/badge/DB-PostgreSQL%2FSQLite-blue)
 
-![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)
-![Sleep](https://img.shields.io/badge/Sleep-Optional-red.svg)
-![Coffee](https://img.shields.io/badge/Coffee-Required-brown.svg)
-![Diapers](https://img.shields.io/badge/Diapers-Infinite-yellow.svg)
+## ✨ Funzionalità
 
-## 🎭 Perché ti serve?
+### 🍼 Allattamento & Pappa
+*   **Timer Live**: Start/Stop per Tetta Destra/Sinistra.
+*   **Log Manuale "Smart"**: Inserisci durata e orario di inizio con un orologio interattivo (stile Apple) o backdata eventi passati.
+*   **Biberon**: Registra quantità esatte (ml).
+*   **Status View**: Vedi subito quanto tempo è passato dall'ultima poppata e quale lato tocca adesso ("Next Side").
 
-*   🤯 **Memoria da Pesce Rosso**: "Amore, a che ora ha mangiato?" -> "Boh." -> *Panico*. Con Baby Tracker apri Telegram e sai.
-*   📊 **Grafici per Nerd**: Vuoi correlare la durata della poppata con la probabilità di un pannolino esplosivo? Ora puoi (con Grafana).
-*   👪 **Teamwork**: Mamma e Papà usano lo stesso bot. Niente più foglietti di carta persi o app non sincronizzate.
+### 💩 Cambio Pannolino
+*   Registro rapido per **Cacca** e **Pipì** (o entrambi).
+*   Ultimo cambio sempre visibile nello stato.
 
-## ✨ Cosa sa fare (oltre a non dormire)
+### 📉 Crescita
+*   Registro **Peso** e **Altezza**.
+*   (Coming soon) Grafici di crescita.
 
-*   💩 **Pannolini**: Registra le "produzioni artistiche" (Pipì / Cacca / Disastro Nucleare) con un tap.
-*   🍼 **Allattamento**:
-    *   **Timer Live**: Premi Start quando inizi, Stop quando crolli (tu o lui/lei).
-    *   **Manuale**: "Ah già, ha mangiato un'ora fa".
-    *   **Lati**: Dx, Sx, Entrambi o Biberon.
-*   📏 **Crescita**: Peso, Altezza e "Testone" (Circonferenza).
+### 👪 Multi-Utente & Condivisione
+*   **Tenant System**: Ogni tracker è un "gruppo" isolato.
+*   **Invite Link**: Genera un link `/invite` dal pannello Admin per aggiungere partner/nonni al tuo stesso tracker. Tutti vedono e aggiornano gli stessi dati.
 
-## 🚀 Installazione (HACS)
-
-Ok, bando alle ciance. Ecco come si mette in piedi la baracca.
-
-### 1. Inietta gli Helper (YAML)
-Dobbiamo dire ad Home Assistant dove mettere i dati (perché il database SQL non ci piace nudo e crudo).
-
-1.  Prendi il file `ha_package/baby_tracker.yaml` e buttalo con cattiveria nella cartella `config/packages/` del tuo Home Assistant.
-    *   *Nota da Nerd*: Controlla di avere `packages: !include_dir_named packages` nel tuo `configuration.yaml` se no non va nulla.
-2.  **Riavvia HA**. Incrocia le dita.
-
-### 2. HACS Attack
-1.  Apri HACS.
-2.  Menu (tre puntini) -> "Repository Personalizzati".
-3.  Incolla il link del repo: `https://github.com/ntotao/baby_tracker`.
-4.  Categoria: "Integration".
-5.  Installa. Riavvia. Solita roba.
-
-### 3. Configurazione Finale
-1.  **Impostazioni** -> **Dispositivi e Servizi** -> **Aggiungi Integrazione**.
-2.  Cerca **Baby Tracker**.
-3.  Dagli in pasto il **Telegram Bot Token** (chiama @BotFather se non ce l'hai).
-4.  Fine. Scrivi `/start` al bot e goditi il monitoraggio.
+### 🛠️ Utility Pro
+*   **Storico Interattivo (`/history`)**: Scorri gli ultimi eventi, e cancellali chirurgicamente se hai sbagliato.
+*   **Bulk Import (`/import`)**: Carica vecchi dati da Excel/CSV per non perdere nulla.
+*   **Profilo Baby (`/child`)**: Gestisci Nome e Data di nascita.
 
 ---
 
-*Fatto con ❤️ (e poco sonno) da un genitore per genitori.*
+## 🚀 Installazione (Docker)
+
+Il modo più veloce per partire.
+
+1.  **Clona il repo**:
+    ```bash
+    git clone https://github.com/ntotao/baby_tracker.git
+    cd baby_tracker
+    ```
+
+2.  **Configura Env**:
+    Crea un file `.env` copiando l'esempio:
+    ```bash
+    TELEGRAM_TOKEN=tuo_token_botfather
+    DATABASE_URL=sqlite+aiosqlite:///./baby_tracker.db
+    ```
+
+3.  **Avvia**:
+    ```bash
+    docker compose up -d --build
+    ```
+
+4.  **Usa**:
+    Apri il bot su Telegram e premi `/start`.
+
+---
+
+## 📂 Struttura Progetto
+
+*   `src/app/bot`: Logica del Bot Telegram (Handlers, Menu).
+*   `src/app/db`: Modelli SQLAlchemy e gestione sessione.
+*   `src/app/services`: Logica di business (EventService, TenantService).
+*   `migrations/`: Aggiornamenti database (Alembic).
+
+## 🤖 Comandi Bot
+
+Vedi [bot_config.md](bot_config.md) per la lista completa da dare a @BotFather.
+
+---
+*Fatto con ❤️ (e poco sonno).*
