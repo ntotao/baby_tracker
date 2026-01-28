@@ -1,0 +1,13 @@
+{
+    "domain": "baby_tracker",
+    "name": "Baby Tracker Bot",
+    "codeowners": [
+        "@ntotao"
+    ],
+    "config_flow": false,
+    "documentation": "https://github.com/ntotao/baby_tracker",
+    "iot_class": "local_polling",
+    "issue_tracker": "https://github.com/ntotao/baby_tracker/issues",
+    "requirements": [],
+    "version": "1.0.0"
+}

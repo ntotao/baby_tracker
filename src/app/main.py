@@ -67,11 +67,15 @@ async def lifespan(app: FastAPI):
             await bot_app.stop()
             await bot_app.shutdown()
 
+from src.app.api.ha import router as ha_router
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+app.include_router(ha_router, prefix="/api/ha", tags=["Home Assistant"])
 
 @app.get("/health")
 async def health_check():
