@@ -151,44 +151,59 @@ async def show_timer_active(update: Update, side: str):
 async def show_status(update: Update, tenant_id: str, service: EventService):
     events = await service.get_recent_events(tenant_id, 10)
     summary = await service.get_daily_summary(tenant_id)
-    last_feed = await service.get_last_feeding(tenant_id)
+    
+    last_feed = await service.get_last_event_by_type(tenant_id, 'allattamento')
+    last_cacca = await service.get_last_event_by_type(tenant_id, 'cacca')
+    last_pipi = await service.get_last_event_by_type(tenant_id, 'pipi')
     
     # --- SMART HEADER ---
     header_text = "📊 *Riepilogo Oggi:*\n"
     
-    # Feeding Status
-    if last_feed:
-        now = datetime.datetime.now()
-        diff = now - last_feed.timestamp.replace(tzinfo=None) # naive check
+    now = datetime.datetime.now()
+
+    def format_diff(timestamp):
+        diff = now - timestamp.replace(tzinfo=None)
         hours = diff.seconds // 3600
         minutes = (diff.seconds % 3600) // 60
-        
+        if diff.days > 0: return ">24h"
+        return f"{hours}h {minutes}m"
+
+    # Feeding
+    if last_feed:
+        time_str = format_diff(last_feed.timestamp)
         last_side = last_feed.details.get('source', 'unknown') if last_feed.details else 'unknown'
-        
-        next_hint = ""
-        if last_side == 'left': next_hint = "👉 Next: Right"
-        elif last_side == 'right': next_hint = "👈 Next: Left"
-        
-        time_str = f"{hours}h {minutes}m fa"
-        if diff.days > 0: time_str = "> 24h fa"
-        
-        header_text += f"🍼 *Ultima Poppata:* {time_str} ({last_side})\n_{next_hint}_\n\n"
+        next_hint = "👉 Next: Right" if last_side == 'left' else "👈 Next: Left" if last_side == 'right' else ""
+        header_text += f"🍼 *Poppata:* {time_str} fa ({last_side})\n   _{next_hint}_\n"
     else:
-        header_text += "🍼 Nessuna poppata registrata.\n\n"
+        header_text += "🍼 *Poppata:* --\n"
+
+    # Cacca
+    if last_cacca:
+        header_text += f"💩 *Cacca:* {format_diff(last_cacca.timestamp)} fa\n"
+    else:
+        header_text += "💩 *Cacca:* --\n"
+
+    # Pipi
+    if last_pipi:
+        header_text += f"💧 *Pipì:* {format_diff(last_pipi.timestamp)} fa\n"
+    else:
+        header_text += "💧 *Pipì:* --\n"
+        
+    header_text += "\n" # Spacer
 
     # Daily Counts
     if not summary:
-        header_text += "Nessun evento oggi.\n"
+        header_text += "_Nessun evento oggi._\n"
     else:
-        for etype, count in summary:
-            icon = "⚪️"
-            if etype == 'cacca': icon = "💩"
-            elif etype == 'pipi': icon = "💧"
-            elif etype == 'allattamento': icon = "🍼"
-            header_text += f"{icon} {etype.capitalize()}: {count}\n"
+        counts = {s[0]: s[1] for s in summary}
+        c_feed = counts.get('allattamento', 0)
+        c_cacca = counts.get('cacca', 0)
+        c_pipi = counts.get('pipi', 0)
+        
+        header_text += f"📆 *Oggi:* 🍼{c_feed} | 💩{c_cacca} | 💧{c_pipi}\n"
             
     # List
-    events_text = "\n🕒 *Storico Recente:*\n"
+    events_text = "\n🕒 *Ultimi Eventi:*\n"
     for e in events:
         ts = e.timestamp.strftime("%H:%M")
         
@@ -196,7 +211,6 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
         if e.details and e.event_type == 'allattamento':
             src = e.details.get('source', '')
             dur = e.details.get('duration_text', '')
-            
             if src == 'left': detail_str = f" (👈 {dur})"
             elif src == 'right': detail_str = f" (👉 {dur})"
             elif src == 'bottle': detail_str = " (🍼)"
@@ -211,6 +225,7 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
 
     msg = f"{header_text}{events_text}"
     kb = [
+        [InlineKeyboardButton("🔄 Aggiorna", callback_data='view_status')],
         [InlineKeyboardButton("🗑️ Elimina Ultimo", callback_data='delete_last_event')],
         [InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]
     ]
