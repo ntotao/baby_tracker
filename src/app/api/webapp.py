@@ -5,7 +5,7 @@ from src.app.services.event import EventService
 from src.app.services.tenant import TenantService
 from sqlalchemy import text
 import logging
-from telegram.helpers import CheckWebAuthSession # Needs telegram[webhooks] or manual validation
+# from telegram.helpers import CheckWebAuthSession # Needs telegram[webhooks] or manual validation
 # Or manual HMAC validation
 
 router = APIRouter()
