@@ -304,7 +304,10 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
     # List
     events_text = "\n🕒 *Ultimi Eventi:*\n"
     for e in events:
-        ts = e.timestamp.strftime("%H:%M")
+        if e.timestamp.date() == now.date():
+            ts = e.timestamp.strftime("%H:%M")
+        else:
+            ts = e.timestamp.strftime("%d/%m %H:%M")
         
         detail_str = ""
         if e.details:
@@ -348,7 +351,7 @@ async def show_status(update: Update, tenant_id: str, service: EventService):
     msg = f"{header_text}{events_text}"
     kb = [
         [InlineKeyboardButton("🔄 Aggiorna", callback_data='view_status')],
-        [InlineKeyboardButton("📜 Storico Completo", callback_data='view_history')],
+        [InlineKeyboardButton("📅 Storico", callback_data='view_history')],
         [InlineKeyboardButton("🔙 Menu", callback_data='menu_main')]
     ]
     
